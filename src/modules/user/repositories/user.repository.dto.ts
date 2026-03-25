@@ -1,24 +1,24 @@
 import { InjectRepository } from "@nestjs/typeorm";
-import { User, UserStatus } from "../entity/user.entity";
+import { User, UserRole, UserStatus } from "../entity/user.entity";
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import * as bcrypt from 'bcrypt';
-import { In, Not, Repository } from "typeorm";
+import { Not, Repository } from "typeorm";
 import { ResponseUserDto } from "../dto/response-user.dto";
 import { UserMapper } from "../user.mapper";
 
-
-
 @Injectable()
 export class UserRepository {
-
     constructor(
-
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
     ) { }
 
     async createUser(data: Partial<User>, authorId: string, tenantId?: string): Promise<ResponseUserDto> {
         const { password, ...userData } = data;
+        const companyData =
+            userData.role === UserRole.SUPER_ADMIN || !tenantId
+                ? {}
+                : { company: { id: tenantId } as any };
 
         if (!password) {
             throw new BadRequestException('Password is required');
@@ -32,7 +32,7 @@ export class UserRepository {
             createdBy: authorId,
             updatedBy: authorId,
             password: hashedPassword,
-            ...(tenantId ? { company: { id: tenantId } as any } : {}),
+            ...companyData,
         });
 
         const saved = await this.userRepo.save(user);
@@ -45,7 +45,6 @@ export class UserRepository {
     }
 
     async findAll(tenantId?: string): Promise<ResponseUserDto[]> {
-
         const users = await this.userRepo.find({
             where: { status: UserStatus.ACTIVE, ...(tenantId ? { company: { id: tenantId } } : {}) },
             relations: ['company'],
@@ -54,7 +53,6 @@ export class UserRepository {
     }
 
     async findById(id: string, tenantId?: string): Promise<ResponseUserDto> {
-
         const user = await this.userRepo.findOne({
             where: { id, status: UserStatus.ACTIVE, ...(tenantId ? { company: { id: tenantId } } : {}) },
             relations: ['company'],
@@ -89,7 +87,9 @@ export class UserRepository {
         if (!user) throw new BadRequestException('User no encontrado');
 
         Object.assign(user, userData);
-        if (companyId) {
+        if (userData.role === UserRole.SUPER_ADMIN) {
+            (user as any).company = null;
+        } else if (companyId) {
             (user as any).company = { id: companyId } as any;
         }
 
@@ -101,11 +101,9 @@ export class UserRepository {
         });
 
         return UserMapper.toResponse(full as User);
-
     }
 
     async deleteUser(id: string, authorId: string, tenantId?: string): Promise<void> {
-
         const user = await this.userRepo.findOne({ where: { id, status: UserStatus.ACTIVE, ...(tenantId ? { company: { id: tenantId } } : {}) } });
         if (!user) {
             throw new NotFoundException('Usuario no encontrado');
@@ -115,8 +113,7 @@ export class UserRepository {
         await this.userRepo.save(user);
     }
 
-    async activeUser(id: string,authorId: string, tenantId?: string): Promise<void> {
-
+    async activeUser(id: string, authorId: string, tenantId?: string): Promise<void> {
         const user = await this.userRepo.findOne({ where: { id, status: UserStatus.INACTIVE, ...(tenantId ? { company: { id: tenantId } } : {}) } });
         if (!user) {
             throw new NotFoundException('Usuario no encontrado');

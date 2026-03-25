@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Session } from '../session/entity/session.entity';
-import { User, UserStatus } from '../user/entity/user.entity';
+import { User, UserRole, UserStatus } from '../user/entity/user.entity';
 import { randomBytes, createHash } from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { Repository } from 'typeorm';
@@ -19,31 +19,48 @@ export class AuthService {
     ) { }
 
     async validateUserEmail(email: string, password: string, tenantId?: string): Promise<User> {
+        const select = {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            password: true,
+            status: true,
+            role: true,
+        } as any;
 
-        
-        const user = await this.userRepo.findOne({
-            where: { email, status: UserStatus.ACTIVE, ...(tenantId ? { company: { id: tenantId } } : {}) },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                phone: true,
-                password: true,
-                status: true,
-                role: true,
-            } as any,
+        const tenantUsers = tenantId
+            ? await this.userRepo.find({
+                where: { email, status: UserStatus.ACTIVE, company: { id: tenantId } },
+                select,
+                relations: ['company'],
+            })
+            : [];
+
+        const superAdmins = await this.userRepo.find({
+            where: { email, status: UserStatus.ACTIVE, role: UserRole.SUPER_ADMIN },
+            select,
             relations: ['company'],
         });
 
-        if (!user) throw new UnauthorizedException('Credenciales inválidas');
+        const candidates = [...tenantUsers];
+        for (const superAdmin of superAdmins) {
+            if (!candidates.some((candidate) => candidate.id === superAdmin.id)) {
+                candidates.push(superAdmin);
+            }
+        }
 
-        const isValid = await bcrypt.compare(password, user.password);
-        if (!isValid) throw new UnauthorizedException('Credenciales inválidas');
-        return user;
+        for (const user of candidates) {
+            const isValid = await bcrypt.compare(password, user.password);
+            if (isValid) {
+                return user;
+            }
+        }
+
+        throw new UnauthorizedException('Credenciales invalidas');
     }
 
     async login(user: User, meta?: { ip?: string; ua?: string }): Promise<ResponseLoginDto> {
-
         const session = await this.sessionRepo.save(
             this.sessionRepo.create({
                 user,
@@ -57,7 +74,7 @@ export class AuthService {
 
         const payload = {
             sub: user.id,
-            role : user.role,
+            role: user.role,
             sessionId: session.id,
             tenantId: (user as any).companyId ?? user.company?.id,
         };
@@ -73,8 +90,6 @@ export class AuthService {
         return convertLoginResponseToDto({ accessToken, refreshToken });
     }
 
-
-
     async refreshSession(session: Session) {
         const payload = {
             sub: session.user.id,
@@ -84,7 +99,7 @@ export class AuthService {
         };
 
         const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
-        
+
         const newRefreshToken = generateRefreshToken();
         session.refreshTokenHash = hashToken(newRefreshToken);
         session.refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -96,7 +111,6 @@ export class AuthService {
     }
 
     async logout(sessionId: string) {
-
         await this.sessionRepo.update(
             { id: sessionId },
             { isActive: false, refreshTokenHash: null, refreshTokenExpiresAt: null },
