@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UserRepository } from './repositories/user.repository.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ResponseServiceItemDto } from '../service-item/dto/response-service-item.dto';
 
 @Injectable()
 export class UserService {
@@ -32,6 +33,14 @@ export class UserService {
 
     async active(id: string, authorId: string, tenantId?: string) {
         return await this.repository.activeUser(id, authorId, tenantId);
+    }
+
+    async findServices(id: string, tenantId?: string): Promise<ResponseServiceItemDto[]> {
+        return await this.repository.findEmployeeServices(id, tenantId);
+    }
+
+    async setServices(id: string, serviceIds: string[], authorId: string, tenantId?: string): Promise<ResponseServiceItemDto[]> {
+        return await this.repository.setEmployeeServices(id, serviceIds, authorId, tenantId);
     }
 
     async findByEmail(email: string, tenantId?: string) {

@@ -12,6 +12,7 @@ import { PublicCreateAppointmentDto } from './dto/public-create-appointment.dto'
 import { ResponseAppointmentDto } from './dto/response-appointment.dto';
 import { UpdateAppointmentStatusDto } from './dto/update-appointment-status.dto';
 import { AppointmentStatus } from './entity/appointment.entity';
+import { AppointmentFilterDto, AppointmentFilterEmployeeDto } from './dto/filter-appointment.dto';
 
 @Controller('appointments')
 export class AppointmentController {
@@ -43,16 +44,13 @@ export class AppointmentController {
     @Roles('ADMIN')
     findAll(
         @Request() req,
-        @Query('status') status?: AppointmentStatus,
-        @Query('from') from?: string,
-        @Query('to') to?: string,
-        @Query('employeeId') employeeId?: string,
+        @Query() query: AppointmentFilterDto,
     ) {
-        return this.service.findAll(req.tenant.id, {
-            status,
-            from: from ? new Date(from) : undefined,
-            to: to ? new Date(to) : undefined,
-            employeeId,
+         return this.service.findAll(req.tenant.id, {
+            status: query.status,
+            from: query.from ? new Date(query.from) : undefined,
+            to: query.to ? new Date(query.to) : undefined,
+            employeeId: query.employeeId,
         });
     }
 
@@ -64,14 +62,12 @@ export class AppointmentController {
     @Roles('EMPLOYEE')
     findMy(
         @Request() req,
-        @Query('status') status?: AppointmentStatus,
-        @Query('from') from?: string,
-        @Query('to') to?: string,
+        @Query() query: AppointmentFilterEmployeeDto,
     ) {
         return this.service.findMy(req.user.id, req.tenant.id, {
-            status,
-            from: from ? new Date(from) : undefined,
-            to: to ? new Date(to) : undefined,
+            status: query.status,
+            from: query.from ? new Date(query.from) : undefined,
+            to: query.to ? new Date(query.to) : undefined,
         });
     }
 

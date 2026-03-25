@@ -14,6 +14,7 @@ export class UserMapper {
       status: user.status,
       companyId: (user as any).companyId ?? user.company?.id,
       role: user.role,
+      serviceIds: (user.employeeServices ?? []).map((employeeService) => employeeService.service?.id).filter(Boolean),
     };
   }
 

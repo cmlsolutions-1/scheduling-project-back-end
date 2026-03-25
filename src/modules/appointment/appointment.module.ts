@@ -8,10 +8,11 @@ import { Client } from '../client/entity/client.entity';
 import { ClientModule } from '../client/client.module';
 import { ServiceItem } from '../service-item/entity/service-item.entity';
 import { User } from '../user/entity/user.entity';
+import { EmployeeService } from '../user/entity/employee-service.entity';
 import { Commission } from '../billing/entity/commission.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Appointment, Client, ServiceItem, User, Commission]), ClientModule],
+  imports: [TypeOrmModule.forFeature([Appointment, Client, ServiceItem, User, EmployeeService, Commission]), ClientModule],
   controllers: [AppointmentController],
   providers: [AppointmentService, AppointmentRepository],
   exports: [TypeOrmModule, AppointmentRepository],

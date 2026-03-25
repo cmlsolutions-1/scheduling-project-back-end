@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Client, ClientStatus } from 'src/modules/client/entity/client.entity';
 import { ClientRepository } from 'src/modules/client/repositories/client.repository.dto';
+import { EmployeeService } from 'src/modules/user/entity/employee-service.entity';
 import { User, UserRole, UserStatus } from 'src/modules/user/entity/user.entity';
 import { ServiceItem, ServiceItemStatus } from 'src/modules/service-item/entity/service-item.entity';
 import { Appointment, AppointmentStatus } from './entity/appointment.entity';
@@ -23,6 +24,8 @@ export class AppointmentService {
         private readonly serviceRepo: Repository<ServiceItem>,
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
+        @InjectRepository(EmployeeService)
+        private readonly employeeServiceRepo: Repository<EmployeeService>,
         @InjectRepository(Commission)
         private readonly commissionRepo: Repository<Commission>,
     ) {}
@@ -44,6 +47,7 @@ export class AppointmentService {
                 where: { id: dto.employeeId, role: UserRole.EMPLOYEE, status: UserStatus.ACTIVE, company: { id: tenantId } },
             });
             if (!employee) throw new BadRequestException('Empleado no encontrado');
+            await this.ensureEmployeeCanPerformService(employee.id, dto.serviceId, tenantId);
         }
 
         const appointment = new Appointment();
@@ -76,6 +80,7 @@ export class AppointmentService {
                 where: { id: dto.employeeId, role: UserRole.EMPLOYEE, status: UserStatus.ACTIVE, company: { id: tenantId } },
             });
             if (!employee) throw new BadRequestException('Empleado no encontrado');
+            await this.ensureEmployeeCanPerformService(employee.id, dto.serviceId, tenantId);
         }
 
         const client = await this.clientRepository.upsertByDocumentNumber({
@@ -154,5 +159,18 @@ export class AppointmentService {
         });
 
         return this.commissionRepo.save(commission);
+    }
+
+    private async ensureEmployeeCanPerformService(employeeId: string, serviceId: string, tenantId: string) {
+        const assignment = await this.employeeServiceRepo.findOne({
+            where: {
+                employee: { id: employeeId, role: UserRole.EMPLOYEE, status: UserStatus.ACTIVE, company: { id: tenantId } },
+                service: { id: serviceId, status: ServiceItemStatus.ACTIVE, company: { id: tenantId } },
+            },
+        });
+
+        if (!assignment) {
+            throw new BadRequestException('El empleado no tiene asignado este servicio');
+        }
     }
 }

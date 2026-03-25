@@ -10,6 +10,8 @@ import { ResponseUserDto } from './dto/response-user.dto';
 import { UserService } from './user.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserRole } from './entity/user.entity';
+import { SetEmployeeServicesDto } from './dto/set-employee-services.dto';
+import { ResponseServiceItemDto } from '../service-item/dto/response-service-item.dto';
 
 @Controller('user')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -55,6 +57,36 @@ export class UserController {
             }
         }
         return this.service.findAll(tenantId);
+    }
+
+    @Get(':id/services')
+    @ApiOkWrappedArray(ResponseServiceItemDto, 'Servicios del empleado')
+    @ApiCommonErrors()
+    @Roles('SUPER_ADMIN', 'ADMIN')
+    findServices(@Param('id') id: string, @Request() req) {
+        const tenantId = req.user.role === 'ADMIN' ? req.tenant?.id : undefined;
+        if (req.user.role === 'ADMIN') {
+            if (!tenantId) throw new BadRequestException('Empresa no identificada');
+            if (req.user.companyId && req.user.companyId !== tenantId) {
+                throw new BadRequestException('Empresa no coincide con la sesion activa');
+            }
+        }
+        return this.service.findServices(id, tenantId);
+    }
+
+    @Put(':id/services')
+    @ApiOkWrappedArray(ResponseServiceItemDto, 'Servicios del empleado actualizados')
+    @ApiCommonErrors()
+    @Roles('SUPER_ADMIN', 'ADMIN')
+    setServices(@Param('id') id: string, @Body() dto: SetEmployeeServicesDto, @Request() req) {
+        const tenantId = req.user.role === 'ADMIN' ? req.tenant?.id : undefined;
+        if (req.user.role === 'ADMIN') {
+            if (!tenantId) throw new BadRequestException('Empresa no identificada');
+            if (req.user.companyId && req.user.companyId !== tenantId) {
+                throw new BadRequestException('Empresa no coincide con la sesion activa');
+            }
+        }
+        return this.service.setServices(id, dto.serviceIds, req.user.id, tenantId);
     }
 
     @Get(':id')

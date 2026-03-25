@@ -36,23 +36,9 @@ export class TenantMiddleware implements NestMiddleware {
         const hostValue = Array.isArray(hostHeader) ? hostHeader[0] : hostHeader;
         const hostname = hostValue?.split(':')[0]?.toLowerCase();
 
-        const url = (req as any).originalUrl || req.url || '';
-        const [pathOnly, query] = url.split('?');
-        const segments = pathOnly.split('/').filter(Boolean);
-
-        let routeTenant: string | null = null;
-        let shouldRewrite = false;
-        let rewriteSegments: string[] | null = null;
-
-        if (segments.length > 1 && segments[0] === 'api') {
-            routeTenant = segments[1];
-            shouldRewrite = true;
-            rewriteSegments = ['api', ...segments.slice(2)];
-        } else if (segments.length > 1 && segments[1] === 'api') {
-            routeTenant = segments[0];
-            shouldRewrite = true;
-            rewriteSegments = ['api', ...segments.slice(2)];
-        }
+        const originalUrl = (req as any).originalUrl || req.url || '';
+        const routeInfo = this.extractRouteTenantInfo(originalUrl);
+        const routeTenant = routeInfo?.tenant ?? null;
 
         const candidates = [headerTenantId, headerTenant, headerTenantDomain, routeTenant, hostname]
             .filter((value): value is string => typeof value === 'string' && value.length > 0)
@@ -63,9 +49,8 @@ export class TenantMiddleware implements NestMiddleware {
                 where: { frontendDomain: candidate, status: CompanyStatus.ACTIVE },
             });
             if (company) {
-                if (shouldRewrite && rewriteSegments) {
-                    const newPath = '/' + rewriteSegments.join('/');
-                    (req as any).url = query ? `${newPath}?${query}` : newPath;
+                if (routeInfo?.shouldRewrite) {
+                    this.rewriteRequestUrl(req, routeInfo.tenant);
                 }
                 return company;
             }
@@ -78,5 +63,39 @@ export class TenantMiddleware implements NestMiddleware {
         const raw = req.headers[key] as string | string[] | undefined;
         if (!raw) return null;
         return Array.isArray(raw) ? raw[0] : raw;
+    }
+
+    private extractRouteTenantInfo(url: string): { tenant: string; shouldRewrite: boolean } | null {
+        const [pathOnly] = url.split('?');
+        const segments = pathOnly.split('/').filter(Boolean);
+
+        if (segments.length > 2 && segments[0] === 'api') {
+            return { tenant: segments[1], shouldRewrite: true };
+        }
+
+        if (segments.length > 2 && segments[1] === 'api') {
+            return { tenant: segments[0], shouldRewrite: true };
+        }
+
+        return null;
+    }
+
+    private rewriteRequestUrl(req: Request, tenant: string) {
+        const currentUrl = req.url || '';
+        const [pathOnly, query] = currentUrl.split('?');
+        const segments = pathOnly.split('/').filter(Boolean);
+
+        let rewrittenSegments = segments;
+
+        if (segments.length > 1 && segments[0] === 'api' && segments[1] === tenant) {
+            rewrittenSegments = ['api', ...segments.slice(2)];
+        } else if (segments.length > 0 && segments[0] === tenant) {
+            rewrittenSegments = segments.slice(1);
+        } else if (segments.length > 2 && segments[0] === tenant && segments[1] === 'api') {
+            rewrittenSegments = ['api', ...segments.slice(2)];
+        }
+
+        const newPath = '/' + rewrittenSegments.join('/');
+        (req as any).url = query ? `${newPath}?${query}` : newPath;
     }
 }

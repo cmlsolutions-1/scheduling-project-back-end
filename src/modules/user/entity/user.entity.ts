@@ -1,6 +1,7 @@
 import { AuditEntity } from "src/modules/common/entities/audit.entity";
 import { Session } from "src/modules/session/entity/session.entity";
 import { Company } from "src/modules/company/entity/company.entity";
+import { EmployeeService } from "./employee-service.entity";
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, RelationId } from "typeorm";
 
 
@@ -55,4 +56,7 @@ export class User extends AuditEntity {
 
     @OneToMany(() => Session, session => session.user)
     sessions: Session[];
+
+    @OneToMany(() => EmployeeService, (employeeService) => employeeService.employee)
+    employeeServices: EmployeeService[];
 }

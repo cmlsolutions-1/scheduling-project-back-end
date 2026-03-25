@@ -6,7 +6,7 @@ services:
   postgres:
     image: postgres:14-alpine
     ports:
-      - "5440:5432"
+      - "5431:5432"
     volumes:
       - "C:/Users/DELL/apps/appunias:/var/lib/postgresql/data"
     environment:

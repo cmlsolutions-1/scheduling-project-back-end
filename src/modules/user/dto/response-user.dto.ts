@@ -38,4 +38,6 @@ export class ResponseUserDto {
     @ApiProperty()
     role: UserRole;
 
+    @ApiProperty({ type: [String], required: false })
+    serviceIds?: string[];
 }

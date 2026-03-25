@@ -1,6 +1,7 @@
 import { AuditEntity } from "src/modules/common/entities/audit.entity";
 import { Company } from "src/modules/company/entity/company.entity";
 import { Appointment } from "src/modules/appointment/entity/appointment.entity";
+import { EmployeeService } from "src/modules/user/entity/employee-service.entity";
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, RelationId } from "typeorm";
 
 export enum ServiceItemStatus {
@@ -41,4 +42,7 @@ export class ServiceItem extends AuditEntity {
 
     @OneToMany(() => Appointment, (appointment) => appointment.service)
     appointments: Appointment[];
+
+    @OneToMany(() => EmployeeService, (employeeService) => employeeService.service)
+    employeeServices: EmployeeService[];
 }
