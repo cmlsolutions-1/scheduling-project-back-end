@@ -64,6 +64,31 @@ export class ClientRepository {
         });
     }
 
+    async findAnyByDocumentNumber(documentNumber: string, tenantId: string) {
+        return this.clientRepo.findOne({
+            where: { documentNumber, company: { id: tenantId } },
+        });
+    }
+
+    async upsertByDocumentNumber(data: Partial<Client>, tenantId: string): Promise<Client> {
+        const client = await this.findAnyByDocumentNumber(data.documentNumber!, tenantId);
+
+        if (client) {
+            Object.assign(client, data, {
+                status: ClientStatus.ACTIVE,
+            });
+
+            const saved = await this.clientRepo.save(client);
+            const full = await this.clientRepo.findOne({
+                where: { id: saved.id }
+            });
+
+            return full ?? saved;
+        }
+
+        return this.createUser(data, tenantId);
+    }
+
     async updateByDocumentNumber(
         documentNumber: string,
         data: Partial<Client>,

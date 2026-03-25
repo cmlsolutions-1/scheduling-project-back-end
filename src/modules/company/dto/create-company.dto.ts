@@ -18,7 +18,7 @@ export class CreateCompanyDto {
     @IsNotEmpty()
     @MaxLength(200)
     @ApiProperty({
-        description: 'Dominio o ruta del frontend, ejemplo: empresa1.midominio.com o empresa1',
+        description: 'Dominio o ruta del frontend, ejemplo: empresa1',
     })
     frontendDomain: string;
 }

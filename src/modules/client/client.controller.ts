@@ -13,21 +13,21 @@ import { TenantGuard } from '../tenant/guards/tenant.guard';
 
 
 @Controller('client')
-@UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
-@ApiBearerAuth('jwt')
 export class ClientController {
 
     constructor(private readonly service: ClientService) { }
 
     @Post()
-    @ApiCreatedWrapped(ResponseClientDto, 'Cliente creado')
+    @UseGuards(TenantGuard)
+    @ApiCreatedWrapped(ResponseClientDto, 'Cliente creado o actualizado')
     @ApiCommonErrors()
-    @Roles('ADMIN')
     create(@Body() dto: CreateClientDto, @Request() req) {
         return this.service.create(dto, req.tenant.id);
     }
 
     @Get()
+    @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
+    @ApiBearerAuth('jwt')
     @ApiOkWrappedArray(ResponseClientDto, 'Lista de clientes')
     @ApiCommonErrors()
     @Roles('ADMIN')
@@ -36,6 +36,8 @@ export class ClientController {
     }
 
     @Get(':id')
+    @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
+    @ApiBearerAuth('jwt')
     @ApiOkWrapped(ResponseClientDto, 'Cliente encontrado')
     @ApiCommonErrors()
     @Roles('ADMIN')
@@ -44,6 +46,8 @@ export class ClientController {
     }
 
     @Put(':id')
+    @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
+    @ApiBearerAuth('jwt')
     @ApiOkWrapped(ResponseClientDto, 'Cliente actualizado')
     @ApiCommonErrors()
     @Roles('ADMIN')
@@ -52,6 +56,8 @@ export class ClientController {
     }
 
     @Delete(':id')
+    @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
+    @ApiBearerAuth('jwt')
     @ApiCommonErrors()
     @ApiOkWrapped(Boolean, 'Cliente eliminado exitosamente')
     @Roles('ADMIN')
@@ -60,6 +66,8 @@ export class ClientController {
     }
 
     @Put('active/:id')
+    @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
+    @ApiBearerAuth('jwt')
     @ApiCommonErrors()
     @ApiOkWrapped(Boolean, 'Cliente activado exitosamente')
     @Roles('ADMIN')

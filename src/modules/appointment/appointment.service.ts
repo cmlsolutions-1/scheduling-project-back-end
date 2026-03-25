@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Client, ClientStatus } from 'src/modules/client/entity/client.entity';
+import { ClientRepository } from 'src/modules/client/repositories/client.repository.dto';
 import { User, UserRole, UserStatus } from 'src/modules/user/entity/user.entity';
 import { ServiceItem, ServiceItemStatus } from 'src/modules/service-item/entity/service-item.entity';
 import { Appointment, AppointmentStatus } from './entity/appointment.entity';
@@ -15,6 +16,7 @@ import { Commission, CommissionStatus } from 'src/modules/billing/entity/commiss
 export class AppointmentService {
     constructor(
         private readonly appointmentRepo: AppointmentRepository,
+        private readonly clientRepository: ClientRepository,
         @InjectRepository(Client)
         private readonly clientRepo: Repository<Client>,
         @InjectRepository(ServiceItem)
@@ -76,35 +78,15 @@ export class AppointmentService {
             if (!employee) throw new BadRequestException('Empleado no encontrado');
         }
 
-        let client = await this.clientRepo.findOne({
-            where: { documentNumber: dto.documentNumber, company: { id: tenantId } },
-        });
-
-        if (client) {
-            Object.assign(client, {
-                name: dto.clientName,
-                email: dto.clientEmail,
-                phone: dto.clientPhone,
-                documentType: dto.documentType,
-                address: dto.address,
-                birthDate: new Date(dto.birthDate),
-                updatedBy: client.updatedBy ?? undefined,
-            });
-            client = await this.clientRepo.save(client);
-        } else {
-            client = this.clientRepo.create({
-                name: dto.clientName,
-                email: dto.clientEmail,
-                phone: dto.clientPhone,
-                documentType: dto.documentType,
-                documentNumber: dto.documentNumber,
-                address: dto.address,
-                birthDate: new Date(dto.birthDate),
-                status: ClientStatus.ACTIVE,
-                company: { id: tenantId } as any,
-            });
-            client = await this.clientRepo.save(client);
-        }
+        const client = await this.clientRepository.upsertByDocumentNumber({
+            name: dto.clientName,
+            email: dto.clientEmail,
+            phone: dto.clientPhone,
+            documentType: dto.documentType,
+            documentNumber: dto.documentNumber,
+            address: dto.address,
+            birthDate: new Date(dto.birthDate),
+        }, tenantId);
 
         const appointment = new Appointment();
         appointment.company = { id: tenantId } as any;

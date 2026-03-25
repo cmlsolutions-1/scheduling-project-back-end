@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { Client } from './entity/client.entity';
 import { ClientRepository } from './repositories/client.repository.dto';
 import { CreateClientDto } from './dto/create-client.dto';
 
@@ -10,11 +9,7 @@ export class ClientService {
     constructor(private readonly repository: ClientRepository) { }
 
     async create(dto: CreateClientDto, tenantId: string) {
-        const validate = await this.validateFieldsCreate(dto.documentNumber, tenantId);
-        if (validate) {
-            return await this.repository.updateByDocumentNumber(dto.documentNumber, dto, tenantId);
-        }
-        return this.repository.createUser(dto, tenantId);
+        return this.repository.upsertByDocumentNumber(dto, tenantId);
     }
 
     async findAll(tenantId: string) {
@@ -39,16 +34,6 @@ export class ClientService {
 
     async findByEmail(email: string, tenantId: string) {
         return await this.repository.findByEmail(email, tenantId);
-    }
-
-    async validateFieldsCreate(numberDocument: string, tenantId: string) {
-
-        if (await this.repository.validateByDocumentNumber(numberDocument, tenantId)) {
-           return true;
-        }
-
-        return false;
-
     }
 
 }

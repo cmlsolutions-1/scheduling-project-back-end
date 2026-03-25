@@ -12,4 +12,4 @@
 
 para correr swagger se usa la siguiente url: 
 
-http://localhost:3000/docs
+http://localhost:3100/docs

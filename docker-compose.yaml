@@ -6,11 +6,11 @@ services:
   postgres:
     image: postgres:14-alpine
     ports:
-      - "5431:5432"
+      - "5440:5432"
     volumes:
-      - "C:/Users/DELL/apps/postgrescasanova:/var/lib/postgresql/data"
+      - "C:/Users/DELL/apps/appunias:/var/lib/postgresql/data"
     environment:
       - POSTGRES_PASSWORD=S3cret
       - POSTGRES_USER=cmlsolutions
-      - POSTGRES_DB=app-booking
+      - POSTGRES_DB=app-scheduling-project
     restart: unless-stopped
