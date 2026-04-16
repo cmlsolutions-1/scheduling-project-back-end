@@ -2,9 +2,12 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ResponseInterceptor } from './modules/common/interceptors/response.interceptor.interceptor';
 import { AllExceptionsFilter } from './modules/common/filters/all-exceptions.filter';
 import * as dotenv from 'dotenv';
+import { existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
 dotenv.config();
 
 const tenantHeaderParameters = [
@@ -30,6 +33,20 @@ const tenantHeaderParameters = [
     description: 'Tenant por dominio frontal',
   },
 ];
+
+const reservedApiSegments = new Set([
+  'auth',
+  'session',
+  'company',
+  'user',
+  'client',
+  'services',
+  'appointments',
+  'liquidations',
+  'dashboard',
+  'media',
+  'docs',
+]);
 
 function enhanceSwaggerWithTenantSupport(document: any) {
   document.servers = [
@@ -74,7 +91,12 @@ function enhanceSwaggerWithTenantSupport(document: any) {
 
 async function bootstrap() {
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const uploadsPath = join(process.cwd(), 'uploads');
+
+  if (!existsSync(uploadsPath)) {
+    mkdirSync(uploadsPath, { recursive: true });
+  }
 
   console.log('DB_PASSWORD:', process.env.DB_PASSWORD, typeof process.env.DB_PASSWORD);
   console.log('__dirname:', __dirname);
@@ -87,10 +109,10 @@ async function bootstrap() {
     let tenantFromPath: string | null = null;
     let rewrittenSegments: string[] | null = null;
 
-    if (segments.length > 2 && segments[0] === 'api') {
+    if (segments.length > 2 && segments[0] === 'api' && !reservedApiSegments.has(segments[1])) {
       tenantFromPath = segments[1];
       rewrittenSegments = ['api', ...segments.slice(2)];
-    } else if (segments.length > 2 && segments[1] === 'api') {
+    } else if (segments.length > 2 && segments[1] === 'api' && !reservedApiSegments.has(segments[0])) {
       tenantFromPath = segments[0];
       rewrittenSegments = ['api', ...segments.slice(2)];
     }
@@ -108,6 +130,21 @@ async function bootstrap() {
   });
 
   app.setGlobalPrefix('api');
+  app.useStaticAssets(uploadsPath, { prefix: '/uploads/' });
+
+  console.log(process.env.FRONTEND_URL);
+  app.enableCors({
+    origin: process.env.FRONTEND_URL,
+    allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-tenant',
+    'x-tenant-id',
+    'x-tenant-domain',
+  ],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  });
+
 
   app.useGlobalFilters(new AllExceptionsFilter());
 
@@ -120,7 +157,7 @@ async function bootstrap() {
   }));
 
   const config = new DocumentBuilder()
-    .setTitle('Hotel casa nova')
+    .setTitle('APlicacion uñas')
     .setDescription('Documentación')
     .setVersion('1.0')
     .addBearerAuth(

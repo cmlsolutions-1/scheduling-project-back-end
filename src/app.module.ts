@@ -13,6 +13,7 @@ import { ServiceItemModule } from './modules/service-item/service-item.module';
 import { AppointmentModule } from './modules/appointment/appointment.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { MediaModule } from './modules/media/media.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import * as dotenv from 'dotenv';
@@ -51,6 +52,7 @@ console.log('DB_PASSWORD:', process.env.DB_PASSWORD, typeof process.env.DB_PASSW
     AppointmentModule,
     BillingModule,
     DashboardModule,
+    MediaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

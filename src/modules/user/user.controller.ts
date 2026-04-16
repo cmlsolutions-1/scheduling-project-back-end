@@ -12,6 +12,8 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UserRole } from './entity/user.entity';
 import { SetEmployeeServicesDto } from './dto/set-employee-services.dto';
 import { ResponseServiceItemDto } from '../service-item/dto/response-service-item.dto';
+import { SetEmployeeSchedulesDto } from './dto/set-employee-schedules.dto';
+import { ResponseEmployeeScheduleDto } from './dto/response-employee-schedule.dto';
 
 @Controller('user')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -87,6 +89,36 @@ export class UserController {
             }
         }
         return this.service.setServices(id, dto.serviceIds, req.user.id, tenantId);
+    }
+
+    @Get(':id/schedules')
+    @ApiOkWrappedArray(ResponseEmployeeScheduleDto, 'Horarios del empleado')
+    @ApiCommonErrors()
+    @Roles('SUPER_ADMIN', 'ADMIN')
+    findSchedules(@Param('id') id: string, @Request() req) {
+        const tenantId = req.user.role === 'ADMIN' ? req.tenant?.id : undefined;
+        if (req.user.role === 'ADMIN') {
+            if (!tenantId) throw new BadRequestException('Empresa no identificada');
+            if (req.user.companyId && req.user.companyId !== tenantId) {
+                throw new BadRequestException('Empresa no coincide con la sesion activa');
+            }
+        }
+        return this.service.findSchedules(id, tenantId);
+    }
+
+    @Put(':id/schedules')
+    @ApiOkWrappedArray(ResponseEmployeeScheduleDto, 'Horarios del empleado actualizados')
+    @ApiCommonErrors()
+    @Roles('SUPER_ADMIN', 'ADMIN')
+    setSchedules(@Param('id') id: string, @Body() dto: SetEmployeeSchedulesDto, @Request() req) {
+        const tenantId = req.user.role === 'ADMIN' ? req.tenant?.id : undefined;
+        if (req.user.role === 'ADMIN') {
+            if (!tenantId) throw new BadRequestException('Empresa no identificada');
+            if (req.user.companyId && req.user.companyId !== tenantId) {
+                throw new BadRequestException('Empresa no coincide con la sesion activa');
+            }
+        }
+        return this.service.setSchedules(id, dto.schedules, req.user.id, tenantId);
     }
 
     @Get(':id')

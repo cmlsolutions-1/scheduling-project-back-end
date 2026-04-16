@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorators';
 import { JwtAuthGuard } from '../auth/guards/jwt/jwt.guard';
@@ -7,6 +7,7 @@ import { ApiCommonErrors } from '../common/decorators/swagger/api-helper-errors'
 import { ApiCreatedWrapped, ApiOkWrapped, ApiOkWrappedArray } from '../common/decorators/swagger/api-wrapped-response.decorator';
 import { TenantGuard } from '../tenant/guards/tenant.guard';
 import { BillingService } from './billing.service';
+import { ResponseCommissionByLiquidationDto } from './dto/response-commission-by-liquidation.dto';
 import { ExecuteLiquidationDto } from './dto/execute-liquidation.dto';
 import { LiquidationFilterDto } from './dto/liquidation-filter.dto';
 import { ResponseLiquidationDto } from './dto/response-liquidation.dto';
@@ -40,5 +41,13 @@ export class BillingController {
     @Roles('ADMIN')
     list(@Query() query: LiquidationFilterDto, @Request() req) {
         return this.service.list(req.tenant.id, query);
+    }
+
+    @Get(':id/commissions')
+    @ApiOkWrappedArray(ResponseCommissionByLiquidationDto, 'Comisiones de la liquidacion')
+    @ApiCommonErrors()
+    @Roles('ADMIN')
+    findCommissions(@Param('id') id: string, @Request() req) {
+        return this.service.findCommissionsByLiquidation(id, req.tenant.id);
     }
 }

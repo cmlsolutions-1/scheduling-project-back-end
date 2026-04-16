@@ -8,10 +8,11 @@ import { ApiCreatedWrapped, ApiOkWrapped, ApiOkWrappedArray } from '../common/de
 import { TenantGuard } from '../tenant/guards/tenant.guard';
 import { AppointmentService } from './appointment.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import { PublicAvailabilityDto } from './dto/public-availability.dto';
+import { PublicAvailabilityQueryDto } from './dto/public-availability-query.dto';
 import { PublicCreateAppointmentDto } from './dto/public-create-appointment.dto';
 import { ResponseAppointmentDto } from './dto/response-appointment.dto';
 import { UpdateAppointmentStatusDto } from './dto/update-appointment-status.dto';
-import { AppointmentStatus } from './entity/appointment.entity';
 import { AppointmentFilterDto, AppointmentFilterEmployeeDto } from './dto/filter-appointment.dto';
 
 @Controller('appointments')
@@ -34,6 +35,14 @@ export class AppointmentController {
     @ApiCommonErrors()
     createPublic(@Body() dto: PublicCreateAppointmentDto, @Request() req) {
         return this.service.createPublic(dto, req.tenant.id);
+    }
+
+    @Get('public/availability')
+    @UseGuards(TenantGuard)
+    @ApiOkWrapped(PublicAvailabilityDto, 'Disponibilidad publica')
+    @ApiCommonErrors()
+    findPublicAvailability(@Query() query: PublicAvailabilityQueryDto, @Request() req) {
+        return this.service.findPublicAvailability(query, req.tenant.id);
     }
 
     @Get()

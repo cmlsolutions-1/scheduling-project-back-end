@@ -38,4 +38,9 @@ export class UpdateUserDto {
     @IsOptional()
     @ApiProperty({ required: false })
     companyId?: string;
+
+    @IsUUID()
+    @IsOptional()
+    @ApiProperty({ required: false, nullable: true })
+    imageId?: string | null;
 }

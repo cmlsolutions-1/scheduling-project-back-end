@@ -6,10 +6,13 @@ import { User } from './entity/user.entity';
 import { UserRepository } from './repositories/user.repository.dto';
 import { ServiceItem } from '../service-item/entity/service-item.entity';
 import { EmployeeService } from './entity/employee-service.entity';
+import { EmployeeSchedule } from './entity/employee-schedule.entity';
+import { PublicUserController } from './public-user.controller';
+import { MediaModule } from '../media/media.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, ServiceItem, EmployeeService])],
+  imports: [TypeOrmModule.forFeature([User, ServiceItem, EmployeeService, EmployeeSchedule]), MediaModule],
   providers: [UserService, UserRepository],
-  controllers: [UserController]
+  controllers: [PublicUserController, UserController]
 })
 export class UserModule {}

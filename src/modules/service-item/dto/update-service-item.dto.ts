@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNumber, IsOptional, IsString, MaxLength, Min } from "class-validator";
+import { IsNumber, IsOptional, IsString, IsUUID, MaxLength, Min } from "class-validator";
 
 export class UpdateServiceItemDto {
     @IsString()
@@ -22,7 +22,18 @@ export class UpdateServiceItemDto {
 
     @IsNumber()
     @IsOptional()
+    @Min(1)
+    @ApiProperty({ required: false, example: 60 })
+    durationMinutes?: number;
+
+    @IsNumber()
+    @IsOptional()
     @Min(0)
     @ApiProperty({ required: false })
     commissionRate?: number;
+
+    @IsOptional()
+    @IsUUID()
+    @ApiProperty({ required: false, nullable: true })
+    imageId?: string | null;
 }

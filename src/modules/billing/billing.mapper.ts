@@ -1,3 +1,5 @@
+import { ResponseCommissionByLiquidationDto } from "./dto/response-commission-by-liquidation.dto";
+import { Commission } from "./entity/commission.entity";
 import { ResponseLiquidationDto } from "./dto/response-liquidation.dto";
 import { ResponseLiquidationPreviewDto } from "./dto/response-liquidation-preview.dto";
 import { Liquidation } from "./entity/liquidation.entity";
@@ -28,5 +30,27 @@ export class BillingMapper {
             totalAmount: total,
             commissionCount: count,
         };
+    }
+
+    static toCommissionResponse(commission: Commission): ResponseCommissionByLiquidationDto {
+        return {
+            id: commission.id,
+            amount: Number(commission.amount),
+            status: commission.status,
+            employeeId: commission.employeeId,
+            appointmentId: commission.appointmentId,
+            liquidationId: commission.liquidationId,
+            createdAt: commission.CreatedAt,
+            appointmentScheduledAt: commission.appointment?.scheduledAt,
+            appointmentStatus: commission.appointment?.status,
+            clientId: commission.appointment?.clientId,
+            serviceId: commission.appointment?.serviceId,
+            servicePrice: commission.appointment ? Number(commission.appointment.servicePrice) : undefined,
+            commissionRate: commission.appointment ? Number(commission.appointment.commissionRate) : undefined,
+        };
+    }
+
+    static toCommissionList(commissions: Commission[]): ResponseCommissionByLiquidationDto[] {
+        return commissions.map((commission) => this.toCommissionResponse(commission));
     }
 }

@@ -8,7 +8,10 @@ export class ServiceItemMapper {
             name: service.name,
             description: service.description,
             price: Number(service.price),
+            durationMinutes: service.durationMinutes,
             commissionRate: Number(service.commissionRate),
+            imageId: service.imageId ?? service.image?.id,
+            imageUrl: service.image?.url,
             status: service.status,
         };
     }

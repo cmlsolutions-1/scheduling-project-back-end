@@ -2,6 +2,7 @@ import { AuditEntity } from "src/modules/common/entities/audit.entity";
 import { Company } from "src/modules/company/entity/company.entity";
 import { Appointment } from "src/modules/appointment/entity/appointment.entity";
 import { EmployeeService } from "src/modules/user/entity/employee-service.entity";
+import { Media } from "src/modules/media/entity/media.entity";
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, RelationId } from "typeorm";
 
 export enum ServiceItemStatus {
@@ -23,6 +24,9 @@ export class ServiceItem extends AuditEntity {
     @Column('numeric', { precision: 12, scale: 2 })
     price: number;
 
+    @Column({ type: 'int', default: 60 })
+    durationMinutes: number;
+
     @Column('numeric', { precision: 5, scale: 2, default: 0 })
     commissionRate: number;
 
@@ -39,6 +43,13 @@ export class ServiceItem extends AuditEntity {
 
     @RelationId((service: ServiceItem) => service.company)
     companyId: string;
+
+    @ManyToOne(() => Media, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'imageId' })
+    image?: Media;
+
+    @RelationId((service: ServiceItem) => service.image)
+    imageId?: string;
 
     @OneToMany(() => Appointment, (appointment) => appointment.service)
     appointments: Appointment[];

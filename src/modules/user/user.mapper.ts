@@ -13,6 +13,8 @@ export class UserMapper {
       phone: (user as any).phone ?? null,
       status: user.status,
       companyId: (user as any).companyId ?? user.company?.id,
+      imageId: (user as any).imageId ?? user.image?.id,
+      imageUrl: user.image?.url,
       role: user.role,
       serviceIds: (user.employeeServices ?? []).map((employeeService) => employeeService.service?.id).filter(Boolean),
     };

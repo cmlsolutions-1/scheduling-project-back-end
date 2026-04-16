@@ -2,6 +2,8 @@ import { AuditEntity } from "src/modules/common/entities/audit.entity";
 import { Session } from "src/modules/session/entity/session.entity";
 import { Company } from "src/modules/company/entity/company.entity";
 import { EmployeeService } from "./employee-service.entity";
+import { EmployeeSchedule } from "./employee-schedule.entity";
+import { Media } from "src/modules/media/entity/media.entity";
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, RelationId } from "typeorm";
 
 
@@ -54,9 +56,19 @@ export class User extends AuditEntity {
     @RelationId((user: User) => user.company)
     companyId?: string;
 
+    @ManyToOne(() => Media, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'imageId' })
+    image?: Media;
+
+    @RelationId((user: User) => user.image)
+    imageId?: string;
+
     @OneToMany(() => Session, session => session.user)
     sessions: Session[];
 
     @OneToMany(() => EmployeeService, (employeeService) => employeeService.employee)
     employeeServices: EmployeeService[];
+
+    @OneToMany(() => EmployeeSchedule, (employeeSchedule) => employeeSchedule.employee)
+    employeeSchedules: EmployeeSchedule[];
 }

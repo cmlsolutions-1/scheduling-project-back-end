@@ -4,6 +4,20 @@ import { NextFunction, Request, Response } from "express";
 import { Repository } from "typeorm";
 import { Company, CompanyStatus } from "src/modules/company/entity/company.entity";
 
+const reservedApiSegments = new Set([
+    'auth',
+    'session',
+    'company',
+    'user',
+    'client',
+    'services',
+    'appointments',
+    'liquidations',
+    'dashboard',
+    'media',
+    'docs',
+]);
+
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
     constructor(
@@ -69,11 +83,11 @@ export class TenantMiddleware implements NestMiddleware {
         const [pathOnly] = url.split('?');
         const segments = pathOnly.split('/').filter(Boolean);
 
-        if (segments.length > 2 && segments[0] === 'api') {
+        if (segments.length > 2 && segments[0] === 'api' && !reservedApiSegments.has(segments[1])) {
             return { tenant: segments[1], shouldRewrite: true };
         }
 
-        if (segments.length > 2 && segments[1] === 'api') {
+        if (segments.length > 2 && segments[1] === 'api' && !reservedApiSegments.has(segments[0])) {
             return { tenant: segments[0], shouldRewrite: true };
         }
 

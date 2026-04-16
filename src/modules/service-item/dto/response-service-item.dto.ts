@@ -15,7 +15,16 @@ export class ResponseServiceItemDto {
     price: number;
 
     @ApiProperty()
+    durationMinutes: number;
+
+    @ApiProperty()
     commissionRate: number;
+
+    @ApiProperty({ required: false })
+    imageId?: string;
+
+    @ApiProperty({ required: false })
+    imageUrl?: string;
 
     @ApiProperty({ enum: ServiceItemStatus })
     status: ServiceItemStatus;

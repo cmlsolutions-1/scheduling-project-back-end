@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Between, Repository } from "typeorm";
+import { Between, Not, Repository } from "typeorm";
 import { Appointment, AppointmentStatus } from "../entity/appointment.entity";
 
 export interface AppointmentFilters {
@@ -44,5 +44,17 @@ export class AppointmentRepository {
 
     async findForEmployee(employeeId: string, tenantId: string, filters: AppointmentFilters = {}): Promise<Appointment[]> {
         return this.findAll(tenantId, { ...filters, employeeId });
+    }
+
+    async findBlockingAppointmentsForEmployeeOnDate(employeeId: string, tenantId: string, from: Date, to: Date): Promise<Appointment[]> {
+        return this.appointmentRepo.find({
+            where: {
+                company: { id: tenantId },
+                employee: { id: employeeId },
+                status: Not(AppointmentStatus.CANCELLED),
+                scheduledAt: Between(from, to),
+            },
+            order: { scheduledAt: 'ASC' },
+        });
     }
 }

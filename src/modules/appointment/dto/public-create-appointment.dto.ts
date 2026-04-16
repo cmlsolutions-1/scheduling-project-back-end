@@ -54,7 +54,7 @@ export class PublicCreateAppointmentDto {
     scheduledAt: string;
 
     @IsInt()
-    @Min(0)
+    @Min(1)
     @IsOptional()
     @ApiProperty({ required: false, example: 60 })
     durationMinutes?: number;

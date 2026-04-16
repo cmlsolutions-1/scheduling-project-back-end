@@ -3,6 +3,9 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UserRepository } from './repositories/user.repository.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ResponseServiceItemDto } from '../service-item/dto/response-service-item.dto';
+import { PublicEmployeeDto } from './dto/public-employee.dto';
+import { EmployeeScheduleInputDto } from './dto/set-employee-schedules.dto';
+import { ResponseEmployeeScheduleDto } from './dto/response-employee-schedule.dto';
 
 @Injectable()
 export class UserService {
@@ -17,6 +20,10 @@ export class UserService {
 
     async findAll(tenantId?: string) {
         return await this.repository.findAll(tenantId);
+    }
+
+    async findPublicEmployees(tenantId: string): Promise<PublicEmployeeDto[]> {
+        return await this.repository.findPublicEmployees(tenantId);
     }
 
     async findOne(id: string, tenantId?: string) {
@@ -41,6 +48,14 @@ export class UserService {
 
     async setServices(id: string, serviceIds: string[], authorId: string, tenantId?: string): Promise<ResponseServiceItemDto[]> {
         return await this.repository.setEmployeeServices(id, serviceIds, authorId, tenantId);
+    }
+
+    async findSchedules(id: string, tenantId?: string): Promise<ResponseEmployeeScheduleDto[]> {
+        return await this.repository.findEmployeeSchedules(id, tenantId);
+    }
+
+    async setSchedules(id: string, schedules: EmployeeScheduleInputDto[], authorId: string, tenantId?: string): Promise<ResponseEmployeeScheduleDto[]> {
+        return await this.repository.setEmployeeSchedules(id, schedules, authorId, tenantId);
     }
 
     async findByEmail(email: string, tenantId?: string) {

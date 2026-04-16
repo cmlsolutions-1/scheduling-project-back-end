@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
 import { User, UserRole, UserStatus } from '../user/entity/user.entity';
@@ -97,6 +97,27 @@ export class BillingService {
             order: { periodStart: 'DESC' },
         });
         return BillingMapper.toLiquidationList(liquidations);
+    }
+
+    async findCommissionsByLiquidation(liquidationId: string, tenantId: string) {
+        const liquidation = await this.liquidationRepo.findOne({
+            where: { id: liquidationId, company: { id: tenantId } },
+        });
+
+        if (!liquidation) {
+            throw new NotFoundException('Liquidacion no encontrada');
+        }
+
+        const commissions = await this.commissionRepo.find({
+            where: {
+                company: { id: tenantId },
+                liquidation: { id: liquidationId },
+            },
+            relations: ['appointment'],
+            order: { CreatedAt: 'ASC' },
+        });
+
+        return BillingMapper.toCommissionList(commissions);
     }
 
     private resolvePeriod(filter: LiquidationFilterDto | ExecuteLiquidationDto) {

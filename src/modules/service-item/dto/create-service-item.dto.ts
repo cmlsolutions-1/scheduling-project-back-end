@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from "class-validator";
+import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, MaxLength, Min } from "class-validator";
 
 export class CreateServiceItemDto {
     @IsString()
@@ -20,7 +20,18 @@ export class CreateServiceItemDto {
     price: number;
 
     @IsNumber()
+    @IsOptional()
+    @Min(1)
+    @ApiProperty({ example: 60, description: 'Duracion del servicio en minutos', required: false })
+    durationMinutes?: number;
+
+    @IsNumber()
     @Min(0)
     @ApiProperty({ example: 40, description: 'Porcentaje de comisión' })
     commissionRate: number;
+
+    @IsOptional()
+    @IsUUID()
+    @ApiProperty({ required: false, nullable: true })
+    imageId?: string | null;
 }

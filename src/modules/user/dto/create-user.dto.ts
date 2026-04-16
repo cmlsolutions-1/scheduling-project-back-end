@@ -39,4 +39,9 @@ export class CreateUserDto {
     @ApiProperty({ required: false })
     companyId?: string;
 
+    @IsUUID()
+    @IsOptional()
+    @ApiProperty({ required: false, nullable: true })
+    imageId?: string | null;
+
 }

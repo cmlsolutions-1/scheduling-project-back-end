@@ -34,6 +34,12 @@ export class ResponseUserDto {
     @ApiProperty({ required: false })
     companyId?: string;
 
+    @ApiProperty({ required: false })
+    imageId?: string;
+
+    @ApiProperty({ required: false })
+    imageUrl?: string;
+
     @IsEnum(UserRole)
     @ApiProperty()
     role: UserRole;
