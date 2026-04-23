@@ -14,6 +14,8 @@ export class AppointmentMapper {
             completedAt: appointment.completedAt ?? undefined,
             serviceId: appointment.serviceId,
             clientId: appointment.clientId,
+            clientName: appointment.client?.name,
+            clientPhone: appointment.client?.phone,
             employeeId: appointment.employeeId ?? undefined,
         };
     }

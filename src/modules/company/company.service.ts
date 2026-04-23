@@ -15,6 +15,14 @@ export class CompanyService {
         return this.repository.findAll();
     }
 
+    findAllWithAdmin() {
+        return this.repository.findAllWithAdmin();
+    }
+
+    findAdminByCompanyId(id: string) {
+        return this.repository.findAdminByCompanyId(id);
+    }
+
     findOne(id: string) {
         return this.repository.findById(id);
     }

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Request, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Query, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ApiBearerAuth } from '@nestjs/swagger';
@@ -14,6 +14,9 @@ import { SetEmployeeServicesDto } from './dto/set-employee-services.dto';
 import { ResponseServiceItemDto } from '../service-item/dto/response-service-item.dto';
 import { SetEmployeeSchedulesDto } from './dto/set-employee-schedules.dto';
 import { ResponseEmployeeScheduleDto } from './dto/response-employee-schedule.dto';
+import { SearchPasswordResetUserDto } from './dto/search-password-reset-user.dto';
+import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
+import { ResponsePasswordResetUserDto } from './dto/response-password-reset-user.dto';
 
 @Controller('user')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -59,6 +62,36 @@ export class UserController {
             }
         }
         return this.service.findAll(tenantId);
+    }
+
+    @Get('password-reset/search')
+    @ApiOkWrappedArray(ResponsePasswordResetUserDto, 'Usuarios encontrados para restablecer contrasena')
+    @ApiCommonErrors()
+    @Roles('SUPER_ADMIN', 'ADMIN')
+    findForPasswordReset(@Query() query: SearchPasswordResetUserDto, @Request() req) {
+        const tenantId = req.user.role === 'ADMIN' ? req.tenant?.id : undefined;
+        if (req.user.role === 'ADMIN') {
+            if (!tenantId) throw new BadRequestException('Empresa no identificada');
+            if (req.user.companyId && req.user.companyId !== tenantId) {
+                throw new BadRequestException('Empresa no coincide con la sesion activa');
+            }
+        }
+        return this.service.findForPasswordReset(query.email, tenantId);
+    }
+
+    @Put(':id/password')
+    @ApiOkWrapped(ResponsePasswordResetUserDto, 'Contrasena restablecida')
+    @ApiCommonErrors()
+    @Roles('SUPER_ADMIN', 'ADMIN')
+    resetPassword(@Param('id') id: string, @Body() dto: ResetUserPasswordDto, @Request() req) {
+        const tenantId = req.user.role === 'ADMIN' ? req.tenant?.id : undefined;
+        if (req.user.role === 'ADMIN') {
+            if (!tenantId) throw new BadRequestException('Empresa no identificada');
+            if (req.user.companyId && req.user.companyId !== tenantId) {
+                throw new BadRequestException('Empresa no coincide con la sesion activa');
+            }
+        }
+        return this.service.resetPassword(id, dto.password, req.user.id, tenantId);
     }
 
     @Get(':id/services')
@@ -147,8 +180,19 @@ export class UserController {
             if (req.user.companyId && req.user.companyId !== tenantId) {
                 throw new BadRequestException('Empresa no coincide con la sesion activa');
             }
+            if (dto.role && dto.role !== UserRole.EMPLOYEE) {
+                throw new BadRequestException('Solo puede actualizar empleados');
+            }
+            if (dto.companyId && dto.companyId !== tenantId) {
+                throw new BadRequestException('No puede mover usuarios a otra empresa');
+            }
         }
-        return this.service.update(id, dto, req.user.id, tenantId);
+        return this.service.update(
+            id,
+            req.user.role === 'ADMIN' ? { ...dto, companyId: tenantId, role: dto.role ?? UserRole.EMPLOYEE } : dto,
+            req.user.id,
+            tenantId,
+        );
     }
 
     @Delete(':id')

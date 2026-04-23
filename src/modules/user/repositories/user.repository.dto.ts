@@ -14,6 +14,8 @@ import { PublicEmployeeDto } from "../dto/public-employee.dto";
 import { EmployeeScheduleInputDto } from "../dto/set-employee-schedules.dto";
 import { ResponseEmployeeScheduleDto } from "../dto/response-employee-schedule.dto";
 import { MediaService } from "src/modules/media/media.service";
+import { Session } from "src/modules/session/entity/session.entity";
+import { ResponsePasswordResetUserDto } from "../dto/response-password-reset-user.dto";
 
 type UserWriteInput = Omit<Partial<User>, 'imageId'> & {
     imageId?: string | null;
@@ -30,24 +32,30 @@ export class UserRepository {
         private readonly employeeServiceRepo: Repository<EmployeeService>,
         @InjectRepository(EmployeeSchedule)
         private readonly employeeScheduleRepo: Repository<EmployeeSchedule>,
+        @InjectRepository(Session)
+        private readonly sessionRepo: Repository<Session>,
         private readonly mediaService: MediaService,
     ) { }
 
     async createUser(data: UserWriteInput, authorId: string, tenantId?: string): Promise<ResponseUserDto> {
         const { password, imageId, ...userData } = data as any;
+        const targetRole = userData.role as UserRole;
+        const targetCompanyId = targetRole === UserRole.SUPER_ADMIN ? undefined : tenantId;
         const companyData =
-            userData.role === UserRole.SUPER_ADMIN || !tenantId
+            targetRole === UserRole.SUPER_ADMIN || !targetCompanyId
                 ? {}
-                : { company: { id: tenantId } as any };
+                : { company: { id: targetCompanyId } as any };
 
         if (!password) {
             throw new BadRequestException('Password is required');
         }
 
+        await this.ensureCompanyUserLimit(targetRole, targetCompanyId);
+
         const hashedPassword = await bcrypt.hash(password, 10);
         const image = await this.mediaService.resolveImageForCompany(
             imageId,
-            userData.role === UserRole.SUPER_ADMIN ? undefined : tenantId,
+            targetRole === UserRole.SUPER_ADMIN ? undefined : targetCompanyId,
         );
 
         const user = this.userRepo.create();
@@ -118,19 +126,77 @@ export class UserRepository {
         });
     }
 
+    async findForPasswordReset(email: string, tenantId?: string): Promise<ResponsePasswordResetUserDto[]> {
+        const users = await this.userRepo.find({
+            where: {
+                email,
+                status: UserStatus.ACTIVE,
+                ...(tenantId ? { company: { id: tenantId }, role: UserRole.EMPLOYEE } : {}),
+            },
+            relations: ['company'],
+            order: { name: 'ASC' },
+        });
+
+        return users.map((user) => this.toPasswordResetUserResponse(user));
+    }
+
+    async resetPassword(
+        id: string,
+        password: string,
+        authorId: string,
+        tenantId?: string,
+    ): Promise<ResponsePasswordResetUserDto> {
+        const user = await this.userRepo.findOne({
+            where: { id, status: UserStatus.ACTIVE, ...(tenantId ? { company: { id: tenantId } } : {}) },
+            relations: ['company'],
+        });
+
+        if (!user) {
+            throw new NotFoundException('Usuario no encontrado');
+        }
+
+        if (tenantId && user.role !== UserRole.EMPLOYEE) {
+            throw new BadRequestException('Solo puede restablecer la contrasena de empleados');
+        }
+
+        user.password = await bcrypt.hash(password, 10);
+        user.updatedBy = authorId;
+        await this.userRepo.save(user);
+
+        await this.invalidateUserSessions(user.id, authorId);
+
+        return this.toPasswordResetUserResponse(user);
+    }
+
     async updateUser(
         id: string,
         data: UserWriteInput,
         authorId: string,
         tenantId?: string
     ): Promise<ResponseUserDto> {
-        const { companyId, imageId, ...userData } = data as any;
+        const { companyId, imageId, password, ...userData } = data as any;
 
         const user = await this.userRepo.findOne({
             where: { id, status: UserStatus.ACTIVE, ...(tenantId ? { company: { id: tenantId } } : {}) },
+            relations: ['company'],
         });
 
         if (!user) throw new BadRequestException('User no encontrado');
+
+        if (tenantId && user.role !== UserRole.EMPLOYEE) {
+            throw new BadRequestException('Solo puede actualizar empleados');
+        }
+
+        if (tenantId && userData.role && userData.role !== UserRole.EMPLOYEE) {
+            throw new BadRequestException('Solo puede actualizar empleados');
+        }
+
+        const nextRole = (userData.role ?? user.role) as UserRole;
+        const nextCompanyId = nextRole === UserRole.SUPER_ADMIN
+            ? undefined
+            : companyId ?? user.companyId ?? user.company?.id;
+
+        await this.ensureCompanyUserLimit(nextRole, nextCompanyId, user.id);
 
         Object.assign(user, userData);
         if (userData.role === UserRole.SUPER_ADMIN) {
@@ -138,30 +204,42 @@ export class UserRepository {
             await this.employeeScheduleRepo.delete({ employee: { id: user.id } } as any);
             (user as any).company = null;
             (user as any).image = null;
-        } else if (userData.role && userData.role !== UserRole.EMPLOYEE) {
-            await this.employeeServiceRepo.delete({ employee: { id: user.id } } as any);
-            await this.employeeScheduleRepo.delete({ employee: { id: user.id } } as any);
-        } else if (companyId) {
-            (user as any).company = { id: companyId } as any;
+        } else {
+            if (userData.role && userData.role !== UserRole.EMPLOYEE) {
+                await this.employeeServiceRepo.delete({ employee: { id: user.id } } as any);
+                await this.employeeScheduleRepo.delete({ employee: { id: user.id } } as any);
+            }
+            if (companyId) {
+                (user as any).company = { id: companyId } as any;
+            }
         }
 
         if (imageId !== undefined) {
-            const effectiveCompanyId = userData.role === UserRole.SUPER_ADMIN
+            const effectiveCompanyId = nextRole === UserRole.SUPER_ADMIN
                 ? undefined
                 : companyId ?? user.companyId ?? (user as any).company?.id;
             const image = await this.mediaService.resolveImageForCompany(imageId, effectiveCompanyId);
             (user as any).image = image ?? null;
         }
 
+        const shouldInvalidateSessions = typeof password === 'string';
+        if (typeof password === 'string') {
+            user.password = await bcrypt.hash(password, 10);
+        }
+
         user.updatedBy = authorId;
         const saved: User = await this.userRepo.save(user);
+
+        if (shouldInvalidateSessions) {
+            await this.invalidateUserSessions(user.id, authorId);
+        }
 
         const full = await this.userRepo.findOne({
             where: { id: saved.id },
             relations: ['company', 'image', 'employeeServices', 'employeeServices.service'],
         });
 
-        return UserMapper.toResponse(full as User);
+        return UserMapper.toResponse(full ?? saved);
     }
 
     async deleteUser(id: string, authorId: string, tenantId?: string): Promise<void> {
@@ -175,10 +253,17 @@ export class UserRepository {
     }
 
     async activeUser(id: string, authorId: string, tenantId?: string): Promise<void> {
-        const user = await this.userRepo.findOne({ where: { id, status: UserStatus.INACTIVE, ...(tenantId ? { company: { id: tenantId } } : {}) } });
+        const user = await this.userRepo.findOne({
+            where: { id, status: UserStatus.INACTIVE, ...(tenantId ? { company: { id: tenantId } } : {}) },
+            relations: ['company'],
+        });
         if (!user) {
             throw new NotFoundException('Usuario no encontrado');
         }
+        if (tenantId && user.role !== UserRole.EMPLOYEE) {
+            throw new BadRequestException('Solo puede activar empleados');
+        }
+        await this.ensureCompanyUserLimit(user.role, user.companyId ?? user.company?.id, user.id);
         user.status = UserStatus.ACTIVE;
         user.updatedBy = authorId;
         await this.userRepo.save(user);
@@ -397,5 +482,67 @@ export class UserRepository {
             startTime: schedule.startTime,
             endTime: schedule.endTime,
         };
+    }
+
+    private toPasswordResetUserResponse(user: User): ResponsePasswordResetUserDto {
+        return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone ?? null,
+            role: user.role,
+            status: user.status,
+            companyId: user.companyId ?? user.company?.id,
+            companyName: user.company?.name,
+        };
+    }
+
+    private async ensureCompanyUserLimit(role?: UserRole, companyId?: string, excludeUserId?: string): Promise<void> {
+        if (!role || role === UserRole.SUPER_ADMIN) {
+            return;
+        }
+
+        if (!companyId) {
+            throw new BadRequestException('companyId es requerido');
+        }
+
+        if (role === UserRole.ADMIN) {
+            const adminCount = await this.countActiveUsersByRole(companyId, UserRole.ADMIN, excludeUserId);
+            if (adminCount >= 1) {
+                throw new BadRequestException('Ya existe un administrador activo para esta empresa');
+            }
+            return;
+        }
+
+        if (role === UserRole.EMPLOYEE) {
+            const employeeCount = await this.countActiveUsersByRole(companyId, UserRole.EMPLOYEE, excludeUserId);
+            if (employeeCount >= 6) {
+                throw new BadRequestException('La empresa ya tiene el limite de 6 empleados activos');
+            }
+        }
+    }
+
+    private async countActiveUsersByRole(companyId: string, role: UserRole, excludeUserId?: string): Promise<number> {
+        return this.userRepo.count({
+            where: {
+                status: UserStatus.ACTIVE,
+                role,
+                company: { id: companyId },
+                ...(excludeUserId ? { id: Not(excludeUserId) } : {}),
+            },
+        });
+    }
+
+    private async invalidateUserSessions(userId: string, authorId: string): Promise<void> {
+        await this.sessionRepo.createQueryBuilder()
+            .update(Session)
+            .set({
+                isActive: false,
+                refreshTokenHash: null,
+                refreshTokenExpiresAt: null,
+                updatedBy: authorId,
+            })
+            .where('"userId" = :userId', { userId })
+            .execute();
     }
 }

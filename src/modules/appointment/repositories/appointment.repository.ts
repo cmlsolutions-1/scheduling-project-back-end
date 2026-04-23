@@ -38,6 +38,7 @@ export class AppointmentRepository {
 
         return this.appointmentRepo.find({
             where,
+            relations: ['service', 'client', 'employee'],
             order: { scheduledAt: 'ASC' },
         });
     }

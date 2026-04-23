@@ -10,6 +10,8 @@ import { CreateCompanyDto } from './dto/create-company.dto';
 import { ResponseCompanyDto } from './dto/response-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { TenantGuard } from '../tenant/guards/tenant.guard';
+import { ResponseCompanyWithAdminDto } from './dto/response-company-with-admin.dto';
+import { ResponseCompanyAdminDto } from './dto/response-company-admin.dto';
 
 @Controller('company')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -33,6 +35,14 @@ export class CompanyController {
         return this.service.findAll();
     }
 
+    @Get('with-admin')
+    @ApiOkWrappedArray(ResponseCompanyWithAdminDto, 'Lista de empresas con administrador')
+    @ApiCommonErrors()
+    @Roles('SUPER_ADMIN')
+    findAllWithAdmin() {
+        return this.service.findAllWithAdmin();
+    }
+
     @Get('me')
     @UseGuards(TenantGuard)
     @ApiOkWrapped(ResponseCompanyDto, 'Empresa actual')
@@ -40,6 +50,14 @@ export class CompanyController {
     @Roles('ADMIN')
     findMine(@Request() req) {
         return this.service.findOne(req.tenant.id);
+    }
+
+    @Get(':id/admin')
+    @ApiOkWrapped(ResponseCompanyAdminDto, 'Administrador de la empresa')
+    @ApiCommonErrors()
+    @Roles('SUPER_ADMIN')
+    findAdminByCompanyId(@Param('id') id: string) {
+        return this.service.findAdminByCompanyId(id);
     }
 
     @Get(':id')

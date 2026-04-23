@@ -33,5 +33,11 @@ export class ResponseAppointmentDto {
     clientId: string;
 
     @ApiProperty({ required: false })
+    clientName?: string;
+
+    @ApiProperty({ required: false })
+    clientPhone?: string;
+
+    @ApiProperty({ required: false })
     employeeId?: string;
 }

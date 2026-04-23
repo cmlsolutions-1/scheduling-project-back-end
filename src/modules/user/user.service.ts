@@ -6,6 +6,7 @@ import { ResponseServiceItemDto } from '../service-item/dto/response-service-ite
 import { PublicEmployeeDto } from './dto/public-employee.dto';
 import { EmployeeScheduleInputDto } from './dto/set-employee-schedules.dto';
 import { ResponseEmployeeScheduleDto } from './dto/response-employee-schedule.dto';
+import { ResponsePasswordResetUserDto } from './dto/response-password-reset-user.dto';
 
 @Injectable()
 export class UserService {
@@ -60,6 +61,14 @@ export class UserService {
 
     async findByEmail(email: string, tenantId?: string) {
         return await this.repository.findByEmail(email, tenantId);
+    }
+
+    async findForPasswordReset(email: string, tenantId?: string): Promise<ResponsePasswordResetUserDto[]> {
+        return await this.repository.findForPasswordReset(email, tenantId);
+    }
+
+    async resetPassword(id: string, password: string, authorId: string, tenantId?: string): Promise<ResponsePasswordResetUserDto> {
+        return await this.repository.resetPassword(id, password, authorId, tenantId);
     }
 
     async validateFieldsCreate(email: string, numberPhone: string, tenantId?: string) {
