@@ -9,37 +9,37 @@ export enum MediaKind {
 @Entity('media')
 export class Media extends AuditEntity {
     @PrimaryGeneratedColumn('uuid')
-    id: string;
+    id!: string;
 
     @Column({
         type: 'enum',
         enum: MediaKind,
         default: MediaKind.IMAGE,
     })
-    kind: MediaKind;
+    kind!: MediaKind;
 
     @Column()
-    originalName: string;
+    originalName!: string;
 
     @Column()
-    fileName: string;
+    fileName!: string;
 
     @Column()
-    mimeType: string;
+    mimeType!: string;
 
     @Column({ type: 'int' })
-    size: number;
+    size!: number;
 
     @Column()
-    url: string;
+    url!: string;
 
     @Column({ length: 64, nullable: true })
     contentHash?: string;
 
     @ManyToOne(() => Company, { nullable: false, onDelete: 'CASCADE' })
     @JoinColumn({ name: 'companyId' })
-    company: Company;
+    company!: Company;
 
     @RelationId((media: Media) => media.company)
-    companyId: string;
+    companyId!: string;
 }

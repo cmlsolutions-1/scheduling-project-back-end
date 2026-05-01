@@ -6,14 +6,14 @@ import { Column, CreateDateColumn, UpdateDateColumn } from "typeorm";
 export abstract class AuditEntity {
 
     @CreateDateColumn()
-    CreatedAt: Date;
+    CreatedAt!: Date;
 
     @UpdateDateColumn()
-    UpdateAt: Date;
+    UpdateAt!: Date;
 
     @Column({ nullable: true })
-    createdBy: string;
+    createdBy!: string;
 
     @Column({ nullable: true })
-    updatedBy: string;
+    updatedBy!: string;
 }

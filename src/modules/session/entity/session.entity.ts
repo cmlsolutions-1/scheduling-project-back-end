@@ -6,12 +6,12 @@ import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from "typeor
 export class Session extends AuditEntity {
 
     @PrimaryGeneratedColumn('uuid')
-    id: string;
+    id!: string;
 
     @ManyToOne(() => User, user => user.sessions, {
         onDelete: 'CASCADE',
     })
-    user: User;
+    user!: User;
 
     @Index()
     @Column({ type: 'text', nullable: true })
@@ -21,7 +21,7 @@ export class Session extends AuditEntity {
     refreshTokenExpiresAt: Date | null;
 
     @Column({ default: true })
-    isActive: boolean;
+    isActive!: boolean;
 
     @Column({ nullable: true })
     ipAddress?: string;

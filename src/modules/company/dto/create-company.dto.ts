@@ -21,4 +21,10 @@ export class CreateCompanyDto {
         description: 'Dominio o ruta del frontend, ejemplo: empresa1',
     })
     frontendDomain: string;
+
+    @IsString()
+    @IsOptional()
+    @MaxLength(30)
+    @ApiProperty({ required: false, description: 'Numero emisor de WhatsApp de la empresa' })
+    whatsappPhoneNumber?: string;
 }

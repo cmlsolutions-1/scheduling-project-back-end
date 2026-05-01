@@ -7,13 +7,13 @@ import { Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Unique } from "t
 @Unique('UQ_employee_service_employee_service', ['employee', 'service'])
 export class EmployeeService extends AuditEntity {
     @PrimaryGeneratedColumn('uuid')
-    id: string;
+    id!: string;
 
     @ManyToOne(() => User, (user) => user.employeeServices, { nullable: false, onDelete: 'CASCADE' })
     @JoinColumn({ name: 'employeeId' })
-    employee: User;
+    employee!: User;
 
     @ManyToOne(() => ServiceItem, (service) => service.employeeServices, { nullable: false, onDelete: 'CASCADE' })
     @JoinColumn({ name: 'serviceId' })
-    service: ServiceItem;
+    service!: ServiceItem;
 }

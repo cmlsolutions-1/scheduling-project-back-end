@@ -15,39 +15,42 @@ export enum CompanyStatus {
 @Entity('company')
 export class Company extends AuditEntity {
     @PrimaryGeneratedColumn('uuid')
-    id: string;
+    id!: string;
 
     @Column({ length: 100 })
-    name: string;
+    name!: string;
 
     @Column({ type: 'text', nullable: true })
     description?: string;
 
     @Column({ length: 200, unique: true })
-    frontendDomain: string;
+    frontendDomain!: string;
+
+    @Column({ length: 30, nullable: true })
+    whatsappPhoneNumber?: string;
 
     @Column({
         type: 'enum',
         enum: CompanyStatus,
         default: CompanyStatus.ACTIVE,
     })
-    status: CompanyStatus;
+    status!: CompanyStatus;
 
     @OneToMany(() => User, (user) => user.company)
-    users: User[];
+    users!: User[];
 
     @OneToMany(() => Client, (client) => client.company)
-    clients: Client[];
+    clients!: Client[];
 
     @OneToMany(() => ServiceItem, (service) => service.company)
-    services: ServiceItem[];
+    services!: ServiceItem[];
 
     @OneToMany(() => Appointment, (appointment) => appointment.company)
-    appointments: Appointment[];
+    appointments!: Appointment[];
 
     @OneToMany(() => Commission, (commission) => commission.company)
-    commissions: Commission[];
+    commissions!: Commission[];
 
     @OneToMany(() => Liquidation, (liquidation) => liquidation.company)
-    liquidations: Liquidation[];
+    liquidations!: Liquidation[];
 }

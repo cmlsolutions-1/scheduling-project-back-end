@@ -16,24 +16,24 @@ export enum EmployeeScheduleDay {
 @Unique('UQ_employee_schedule_employee_day_start_end', ['employee', 'dayOfWeek', 'startTime', 'endTime'])
 export class EmployeeSchedule extends AuditEntity {
     @PrimaryGeneratedColumn('uuid')
-    id: string;
+    id!: string;
 
     @Column({
         type: 'enum',
         enum: EmployeeScheduleDay,
     })
-    dayOfWeek: EmployeeScheduleDay;
+    dayOfWeek!: EmployeeScheduleDay;
 
     @Column({ length: 5 })
-    startTime: string;
+    startTime!: string;
 
     @Column({ length: 5 })
-    endTime: string;
+    endTime!: string;
 
     @ManyToOne(() => User, (user) => user.employeeSchedules, { nullable: false, onDelete: 'CASCADE' })
     @JoinColumn({ name: 'employeeId' })
-    employee: User;
+    employee!: User;
 
     @RelationId((employeeSchedule: EmployeeSchedule) => employeeSchedule.employee)
-    employeeId: string;
+    employeeId!: string;
 }

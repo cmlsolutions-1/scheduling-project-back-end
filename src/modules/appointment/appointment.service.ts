@@ -15,6 +15,8 @@ import { PublicAvailabilityQueryDto } from './dto/public-availability-query.dto'
 import { PublicCreateAppointmentDto } from './dto/public-create-appointment.dto';
 import { AppointmentMapper } from './appointment.mapper';
 import { Commission, CommissionStatus } from 'src/modules/billing/entity/commission.entity';
+import { Company, CompanyStatus } from 'src/modules/company/entity/company.entity';
+import { WhatsAppService } from 'src/modules/common/services/whatsapp.service';
 
 @Injectable()
 export class AppointmentService {
@@ -36,6 +38,9 @@ export class AppointmentService {
         private readonly employeeServiceRepo: Repository<EmployeeService>,
         @InjectRepository(Commission)
         private readonly commissionRepo: Repository<Commission>,
+        @InjectRepository(Company)
+        private readonly companyRepo: Repository<Company>,
+        private readonly whatsAppService: WhatsAppService,
     ) {}
 
     async create(dto: CreateAppointmentDto, tenantId: string, authorId: string) {
@@ -80,10 +85,18 @@ export class AppointmentService {
         appointment.updatedBy = authorId;
 
         const saved = await this.appointmentRepo.save(appointment);
+
+        
+
         return AppointmentMapper.toResponse(saved);
     }
 
     async createPublic(dto: PublicCreateAppointmentDto, tenantId: string) {
+        const company = await this.companyRepo.findOne({
+            where: { id: tenantId, status: CompanyStatus.ACTIVE },
+        });
+        if (!company) throw new BadRequestException('Empresa no encontrada');
+
         const service = await this.serviceRepo.findOne({
             where: { id: dto.serviceId, company: { id: tenantId }, status: ServiceItemStatus.ACTIVE },
         });
@@ -128,6 +141,13 @@ export class AppointmentService {
         appointment.commissionRate = Number(service.commissionRate ?? 0);
 
         const saved = await this.appointmentRepo.save(appointment);
+        await this.sendPublicAppointmentConfirmation({
+            company,
+            client,
+            service,
+            employee,
+            appointment: saved,
+        });
         return AppointmentMapper.toResponse(saved);
     }
 
@@ -374,5 +394,78 @@ export class AppointmentService {
         const [year, month, day] = date.split('-').map(Number);
         const [hours, minutes] = time.split(':').map(Number);
         return new Date(year, month - 1, day, hours, minutes, 0, 0);
+    }
+
+    private async sendPublicAppointmentConfirmation(input: {
+        company: Company;
+        client: Client;
+        service: ServiceItem;
+        employee: User | null;
+        appointment: Appointment;
+    }): Promise<void> {
+        if (!input.company.whatsappPhoneNumber || !input.client.phone) {
+            return;
+        }
+
+        const message = this.buildRandomConfirmationMessage(input);
+        await this.whatsAppService.sendMessage({
+            fromPhoneNumber: input.company.whatsappPhoneNumber,
+            toPhoneNumber: input.client.phone,
+            message,
+        });
+    }
+
+    private buildRandomConfirmationMessage(input: {
+        company: Company;
+        client: Client;
+        service: ServiceItem;
+        employee: User | null;
+        appointment: Appointment;
+    }): string {
+        const clientName = input.client.name;
+        const companyName = input.company.name;
+        const serviceName = input.service.name;
+        const employeeName = input.employee?.name;
+        const scheduledDate = this.formatWhatsAppDate(input.appointment.scheduledAt);
+        const scheduledTime = this.formatWhatsAppTime(input.appointment.scheduledAt);
+        const partyEmoji = '\u{1F389}';
+        const checkEmoji = '\u{2705}';
+        const calendarEmoji = '\u{1F4C5}';
+        const clockEmoji = '\u{23F0}';
+        const serviceEmoji = '\u{1F485}';
+        const professionalEmoji = '\u{1F487}';
+        const sparklesEmoji = '\u{2728}';
+        const heartEmoji = '\u{1F90D}';
+        const handsEmoji = '\u{1F64C}';
+
+        const employeeLine = employeeName
+            ? `\n${professionalEmoji} Profesional asignado: *${employeeName}*`
+            : '';
+
+        const confirmationMessages = [
+            `${partyEmoji} Hola ${clientName}!\n\nTu cita en *${companyName}* ha quedado registrada con exito ${checkEmoji}\n\n${calendarEmoji} Fecha: *${scheduledDate}*\n${clockEmoji} Hora: *${scheduledTime}*\n${serviceEmoji} Servicio: *${serviceName}*${employeeLine}\n\nGracias por confiar en nosotros. Te esperamos! ${sparklesEmoji}`,
+            `${checkEmoji} Hola ${clientName}, tu cita ya esta lista.\n\nHemos confirmado tu reserva en *${companyName}*.\n\n${calendarEmoji} Dia: *${scheduledDate}*\n${clockEmoji} Hora: *${scheduledTime}*\n${serviceEmoji} Servicio: *${serviceName}*${employeeLine}\n\nSi necesitas cambios, escribenos por este medio.`,
+            `${partyEmoji} Reserva confirmada.\n\nHola ${clientName}, tu cita en *${companyName}* quedo agendada correctamente.\n\n${calendarEmoji} Fecha: *${scheduledDate}*\n${clockEmoji} Hora: *${scheduledTime}*\n${serviceEmoji} Servicio: *${serviceName}*${employeeLine}\n\nTe esperamos con gusto ${heartEmoji}`,
+            `${sparklesEmoji} Hola ${clientName}, ya confirmamos tu cita en *${companyName}*.\n\n${clockEmoji} Hora: *${scheduledTime}*\n${calendarEmoji} Fecha: *${scheduledDate}*\n${serviceEmoji} Servicio reservado: *${serviceName}*${employeeLine}\n\nGracias por elegirnos ${handsEmoji}`,
+            `${checkEmoji} Todo listo, ${clientName}.\n\nTu cita fue creada exitosamente en *${companyName}*.\n\n${calendarEmoji} Fecha: *${scheduledDate}*\n${clockEmoji} Hora: *${scheduledTime}*\n${serviceEmoji} Servicio: *${serviceName}*${employeeLine}\n\nTe esperamos para atenderte con mucho gusto ${sparklesEmoji}`,
+        ];
+
+        return confirmationMessages[Math.floor(Math.random() * confirmationMessages.length)];
+    }
+
+    private formatWhatsAppDate(value: Date): string {
+        return new Intl.DateTimeFormat('es-CO', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).format(new Date(value));
+    }
+
+    private formatWhatsAppTime(value: Date): string {
+        return new Intl.DateTimeFormat('es-CO', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+        }).format(new Date(value));
     }
 }

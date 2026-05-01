@@ -20,44 +20,44 @@ export enum DocumentType {
 @Entity('client')
 export class Client extends AuditEntity {
     @PrimaryGeneratedColumn('uuid')
-    id: string;
+    id!: string;
 
     @Column()
-    name: string;
+    name!: string;
 
     @Column()
-    email: string;
+    email!: string;
 
     @Column()
-    phone: string;
+    phone!: string;
 
     @Column({
         type: 'enum',
         enum: ClientStatus,
         default: ClientStatus.ACTIVE,
     })
-    status: ClientStatus;
+    status!: ClientStatus;
 
     @Column({
         type: 'enum',
         enum: DocumentType
     })
-    documentType: DocumentType;
+    documentType!: DocumentType;
 
     @Column()
-    documentNumber: string;
+    documentNumber!: string;
 
     @Column()
-    address: string;
+    address!: string;
 
     @Column()
-    birthDate: Date;
+    birthDate!: Date;
 
     @ManyToOne(() => Company, (company) => company.clients, { nullable: false, onDelete: 'CASCADE' })
     @JoinColumn({ name: 'companyId' })
-    company: Company;
+    company!: Company;
 
     @RelationId((client: Client) => client.company)
-    companyId: string;
+    companyId!: string;
 
 }

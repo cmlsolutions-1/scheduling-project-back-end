@@ -22,32 +22,32 @@ export enum UserRole {
 @Entity('user')
 export class User extends AuditEntity {
     @PrimaryGeneratedColumn('uuid')
-    id: string;
+    id!: string;
 
     @Column()
-    name: string;
+    name!: string;
 
     @Column()
-    email: string;
+    email!: string;
 
     @Column()
-    phone: string;
+    phone!: string;
 
     @Column()
-    password: string;
+    password!: string;
 
     @Column({
         type: 'enum',
         enum: UserStatus,
         default: UserStatus.ACTIVE,
     })
-    status: UserStatus;
+    status!: UserStatus;
 
     @Column({
         type: 'enum',
         enum: UserRole
     })
-    role: UserRole;
+    role!: UserRole;
 
     @ManyToOne(() => Company, (company) => company.users, { nullable: true, onDelete: 'SET NULL' })
     @JoinColumn({ name: 'companyId' })
@@ -64,11 +64,11 @@ export class User extends AuditEntity {
     imageId?: string;
 
     @OneToMany(() => Session, session => session.user)
-    sessions: Session[];
+    sessions!: Session[];
 
     @OneToMany(() => EmployeeService, (employeeService) => employeeService.employee)
-    employeeServices: EmployeeService[];
+    employeeServices!: EmployeeService[];
 
     @OneToMany(() => EmployeeSchedule, (employeeSchedule) => employeeSchedule.employee)
-    employeeSchedules: EmployeeSchedule[];
+    employeeSchedules!: EmployeeSchedule[];
 }

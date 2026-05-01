@@ -15,6 +15,9 @@ export class ResponseCompanyWithAdminDto {
     @ApiProperty()
     frontendDomain: string;
 
+    @ApiProperty({ required: false })
+    whatsappPhoneNumber?: string;
+
     @ApiProperty({ enum: CompanyStatus })
     status: CompanyStatus;
 

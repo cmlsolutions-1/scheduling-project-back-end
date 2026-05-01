@@ -16,10 +16,10 @@ export enum AppointmentStatus {
 @Entity('appointment')
 export class Appointment extends AuditEntity {
     @PrimaryGeneratedColumn('uuid')
-    id: string;
+    id!: string;
 
     @Column({ type: 'timestamp' })
-    scheduledAt: Date;
+    scheduledAt!: Date;
 
     @Column({ type: 'int', nullable: true })
     durationMinutes?: number;
@@ -32,23 +32,23 @@ export class Appointment extends AuditEntity {
         enum: AppointmentStatus,
         default: AppointmentStatus.PENDING,
     })
-    status: AppointmentStatus;
+    status!: AppointmentStatus;
 
     @Column('numeric', { precision: 12, scale: 2 })
-    servicePrice: number;
+    servicePrice!: number;
 
     @Column('numeric', { precision: 5, scale: 2, default: 0 })
-    commissionRate: number;
+    commissionRate!: number;
 
     @Column({ type: 'timestamp', nullable: true })
     completedAt?: Date;
 
     @ManyToOne(() => Company, (company) => company.appointments, { nullable: false, onDelete: 'CASCADE' })
     @JoinColumn({ name: 'companyId' })
-    company: Company;
+    company!: Company;
 
     @RelationId((appointment: Appointment) => appointment.company)
-    companyId: string;
+    companyId!: string;
 
     @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
     @JoinColumn({ name: 'employeeId' })
@@ -59,17 +59,17 @@ export class Appointment extends AuditEntity {
 
     @ManyToOne(() => Client, { nullable: false, onDelete: 'CASCADE' })
     @JoinColumn({ name: 'clientId' })
-    client: Client;
+    client!: Client;
 
     @RelationId((appointment: Appointment) => appointment.client)
-    clientId: string;
+    clientId!: string;
 
     @ManyToOne(() => ServiceItem, (service) => service.appointments, { nullable: false, onDelete: 'CASCADE' })
     @JoinColumn({ name: 'serviceId' })
-    service: ServiceItem;
+    service!: ServiceItem;
 
     @RelationId((appointment: Appointment) => appointment.service)
-    serviceId: string;
+    serviceId!: string;
 
     @OneToOne(() => Commission, (commission) => commission.appointment)
     commission?: Commission;

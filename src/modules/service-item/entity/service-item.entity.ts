@@ -13,36 +13,36 @@ export enum ServiceItemStatus {
 @Entity('service_item')
 export class ServiceItem extends AuditEntity {
     @PrimaryGeneratedColumn('uuid')
-    id: string;
+    id!: string;
 
     @Column({ length: 120 })
-    name: string;
+    name!: string;
 
     @Column({ type: 'text', nullable: true })
     description?: string;
 
     @Column('numeric', { precision: 12, scale: 2 })
-    price: number;
+    price!: number;
 
     @Column({ type: 'int', default: 60 })
-    durationMinutes: number;
+    durationMinutes!: number;
 
     @Column('numeric', { precision: 5, scale: 2, default: 0 })
-    commissionRate: number;
+    commissionRate!: number;
 
     @Column({
         type: 'enum',
         enum: ServiceItemStatus,
         default: ServiceItemStatus.ACTIVE,
     })
-    status: ServiceItemStatus;
+    status!: ServiceItemStatus;
 
     @ManyToOne(() => Company, (company) => company.services, { nullable: false, onDelete: 'CASCADE' })
     @JoinColumn({ name: 'companyId' })
-    company: Company;
+    company!: Company;
 
     @RelationId((service: ServiceItem) => service.company)
-    companyId: string;
+    companyId!: string;
 
     @ManyToOne(() => Media, { nullable: true, onDelete: 'SET NULL' })
     @JoinColumn({ name: 'imageId' })
@@ -52,8 +52,8 @@ export class ServiceItem extends AuditEntity {
     imageId?: string;
 
     @OneToMany(() => Appointment, (appointment) => appointment.service)
-    appointments: Appointment[];
+    appointments!: Appointment[];
 
     @OneToMany(() => EmployeeService, (employeeService) => employeeService.service)
-    employeeServices: EmployeeService[];
+    employeeServices!: EmployeeService[];
 }

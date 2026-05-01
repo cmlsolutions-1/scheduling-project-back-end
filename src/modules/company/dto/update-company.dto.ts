@@ -19,4 +19,10 @@ export class UpdateCompanyDto {
     @MaxLength(200)
     @ApiProperty({ required: false })
     frontendDomain?: string;
+
+    @IsString()
+    @IsOptional()
+    @MaxLength(30)
+    @ApiProperty({ required: false })
+    whatsappPhoneNumber?: string;
 }

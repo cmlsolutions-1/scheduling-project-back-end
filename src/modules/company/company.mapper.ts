@@ -11,6 +11,7 @@ export class CompanyMapper {
             name: company.name,
             description: company.description,
             frontendDomain: company.frontendDomain,
+            whatsappPhoneNumber: company.whatsappPhoneNumber,
             status: company.status,
         };
     }
@@ -27,6 +28,7 @@ export class CompanyMapper {
             name: company.name,
             description: company.description,
             frontendDomain: company.frontendDomain,
+            whatsappPhoneNumber: company.whatsappPhoneNumber,
             status: company.status,
             hasAdmin: !!admin,
             admin: admin ? this.toAdminResponse(admin) : null,
