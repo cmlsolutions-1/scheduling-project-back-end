@@ -54,7 +54,9 @@ export class MediaController {
         @Body() dto: UploadImageDto,
         @Request() req,
     ) {
-        const tenantId = req.user.role === 'ADMIN' ? req.tenant?.id : (dto.companyId ?? req.tenant?.id);
+        const tenantId = req.user.role === 'ADMIN'
+            ? (req.tenant?.id ?? req.user.companyId)
+            : (dto.companyId ?? req.tenant?.id);
 
         if (req.user.role === 'ADMIN') {
             if (!tenantId) throw new BadRequestException('Empresa no identificada');
