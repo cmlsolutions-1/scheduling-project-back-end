@@ -103,8 +103,8 @@ function getAllowedOrigins(): string[] {
     .filter((origin): origin is string => Boolean(origin));
 
   const defaultOrigins = [
-    'http://localhost:3000',
-    'http://localhost:5173',
+    'https://datingsaas.tech',
+    'https://staging.datingsaas.tech',
   ];
 
   return Array.from(new Set([
