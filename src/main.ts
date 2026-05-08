@@ -134,15 +134,28 @@ async function bootstrap() {
 
   console.log(process.env.FRONTEND_URL);
   app.enableCors({
-    origin: process.env.FRONTEND_URL,
-    allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'x-tenant',
-    'x-tenant-id',
-    'x-tenant-domain',
-  ],
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void
+    ) => {
+      const allowedOrigins = [
+        process.env.FRONTEND_URL,
+        "https://datingsaas.tech/",
+        "https://staging.datingsaas.tech/",
+        "http://localhost:" + process.env.PORT
+      ];
+
+      // permite herramientas como Postman o curl
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   });
 
 
