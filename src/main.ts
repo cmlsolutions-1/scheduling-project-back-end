@@ -89,17 +89,39 @@ function enhanceSwaggerWithTenantSupport(document: any) {
   }
 }
 
+function normalizeOrigin(value?: string | null): string | null {
+  if (!value?.trim()) return null;
+  return value.trim().replace(/\/+$/, '');
+}
+
+function getAllowedOrigins(): string[] {
+  const configuredOrigins = [
+    process.env.FRONTEND_URL,
+    ...(process.env.FRONTEND_URLS?.split(',') ?? []),
+  ]
+    .map((origin) => normalizeOrigin(origin))
+    .filter((origin): origin is string => Boolean(origin));
+
+  const defaultOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+  ];
+
+  return Array.from(new Set([
+    ...configuredOrigins,
+    ...defaultOrigins.map((origin) => normalizeOrigin(origin) as string),
+  ]));
+}
+
 async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const uploadsPath = join(process.cwd(), 'uploads');
+  const allowedOrigins = getAllowedOrigins();
 
   if (!existsSync(uploadsPath)) {
     mkdirSync(uploadsPath, { recursive: true });
   }
-
-  console.log('DB_PASSWORD:', process.env.DB_PASSWORD, typeof process.env.DB_PASSWORD);
-  console.log('__dirname:', __dirname);
 
   app.use((req: any, _res: any, next: () => void) => {
     const rawUrl = req.url || '';
@@ -132,30 +154,30 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.useStaticAssets(uploadsPath, { prefix: '/uploads/' });
 
-  console.log(process.env.FRONTEND_URL);
   app.enableCors({
     origin: (
       origin: string | undefined,
       callback: (err: Error | null, allow?: boolean) => void
     ) => {
-      const allowedOrigins = [
-        process.env.FRONTEND_URL,
-        "https://datingsaas.tech/",
-        "https://staging.datingsaas.tech/",
-        "http://localhost:" + process.env.PORT
-      ];
-
-      // permite herramientas como Postman o curl
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.includes(origin)) {
+      const normalizedOrigin = normalizeOrigin(origin);
+
+      if (normalizedOrigin && allowedOrigins.includes(normalizedOrigin)) {
         return callback(null, true);
       }
 
-      return callback(new Error("Not allowed by CORS"));
+      return callback(new Error(`Not allowed by CORS: ${origin}`));
     },
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    credentials: true,
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-tenant',
+      'x-tenant-id',
+      'x-tenant-domain',
+    ],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
 
