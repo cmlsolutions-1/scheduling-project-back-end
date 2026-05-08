@@ -113,6 +113,16 @@ function getAllowedOrigins(): string[] {
   ]));
 }
 
+const corsAllowedHeaders = [
+  'Content-Type',
+  'Authorization',
+  'x-tenant',
+  'x-tenant-id',
+  'x-tenant-domain',
+];
+
+const corsAllowedMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
+
 async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -154,6 +164,31 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.useStaticAssets(uploadsPath, { prefix: '/uploads/' });
 
+  app.use((req: any, res: any, next: () => void) => {
+    const normalizedOrigin = normalizeOrigin(req.headers.origin as string | undefined);
+
+    if (normalizedOrigin && allowedOrigins.includes(normalizedOrigin)) {
+      res.header('Access-Control-Allow-Origin', normalizedOrigin);
+      res.header('Vary', 'Origin');
+      res.header('Access-Control-Allow-Credentials', 'true');
+      res.header('Access-Control-Allow-Methods', corsAllowedMethods.join(','));
+
+      const requestedHeaders = req.headers['access-control-request-headers'];
+      res.header(
+        'Access-Control-Allow-Headers',
+        typeof requestedHeaders === 'string' && requestedHeaders.trim()
+          ? requestedHeaders
+          : corsAllowedHeaders.join(','),
+      );
+    }
+
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+
+    next();
+  });
+
   app.enableCors({
     origin: (
       origin: string | undefined,
@@ -167,17 +202,13 @@ async function bootstrap() {
         return callback(null, true);
       }
 
-      return callback(new Error(`Not allowed by CORS: ${origin}`));
+      return callback(null, false);
     },
     credentials: true,
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'x-tenant',
-      'x-tenant-id',
-      'x-tenant-domain',
-    ],
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: corsAllowedHeaders,
+    methods: corsAllowedMethods,
+    optionsSuccessStatus: 204,
+    preflightContinue: false,
   });
 
 
