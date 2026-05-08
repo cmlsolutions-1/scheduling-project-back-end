@@ -6,14 +6,15 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
 
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json yarn.lock ./
+
+RUN corepack enable && yarn install --frozen-lockfile
 
 COPY nest-cli.json tsconfig.json tsconfig.build.json ./
 COPY src ./src
 
-RUN npm run build
-RUN npm prune --omit=dev
+RUN yarn build
+RUN yarn install --production --frozen-lockfile --ignore-scripts
 
 
 FROM node:20-bullseye-slim AS runtime
