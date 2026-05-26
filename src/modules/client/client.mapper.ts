@@ -13,10 +13,10 @@ export class ClientMapper {
       email: user.email,
       phone: (user as any).phone ?? null,
       status: user.status,
-      documentNumber: user.documentNumber,
-      address: user.address,
-      birthDate: user.birthDate,
-      documentType: user.documentType,
+      documentNumber: user.documentNumber ?? null,
+      address: user.address ?? null,
+      birthDate: user.birthDate ?? null,
+      documentType: user.documentType ?? null,
     };
   }
 

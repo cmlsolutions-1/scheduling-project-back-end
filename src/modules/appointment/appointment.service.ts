@@ -122,10 +122,10 @@ export class AppointmentService {
             name: dto.clientName,
             email: dto.clientEmail,
             phone: dto.clientPhone,
-            documentType: dto.documentType,
-            documentNumber: dto.documentNumber,
-            address: dto.address,
-            birthDate: new Date(dto.birthDate),
+            ...(dto.documentType !== undefined ? { documentType: dto.documentType } : {}),
+            ...(dto.documentNumber !== undefined ? { documentNumber: dto.documentNumber } : {}),
+            ...(dto.address !== undefined ? { address: dto.address } : {}),
+            ...(dto.birthDate !== undefined ? { birthDate: new Date(dto.birthDate) } : {}),
         }, tenantId);
 
         const appointment = new Appointment();

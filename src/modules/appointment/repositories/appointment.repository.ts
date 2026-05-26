@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Between, Not, Repository } from "typeorm";
+import { Between, IsNull, Not, Repository } from "typeorm";
 import { Appointment, AppointmentStatus } from "../entity/appointment.entity";
 
 export interface AppointmentFilters {
@@ -55,6 +55,18 @@ export class AppointmentRepository {
                 status: Not(AppointmentStatus.CANCELLED),
                 scheduledAt: Between(from, to),
             },
+            order: { scheduledAt: 'ASC' },
+        });
+    }
+
+    async findPendingClientReminders(from: Date, to: Date): Promise<Appointment[]> {
+        return this.appointmentRepo.find({
+            where: {
+                status: AppointmentStatus.PENDING,
+                clientReminderSentAt: IsNull(),
+                scheduledAt: Between(from, to),
+            },
+            relations: ['company', 'client', 'service', 'employee'],
             order: { scheduledAt: 'ASC' },
         });
     }

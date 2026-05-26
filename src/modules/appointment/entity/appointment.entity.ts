@@ -43,6 +43,9 @@ export class Appointment extends AuditEntity {
     @Column({ type: 'timestamp', nullable: true })
     completedAt?: Date;
 
+    @Column({ type: 'timestamp', nullable: true })
+    clientReminderSentAt?: Date;
+
     @ManyToOne(() => Company, (company) => company.appointments, { nullable: false, onDelete: 'CASCADE' })
     @JoinColumn({ name: 'companyId' })
     company!: Company;

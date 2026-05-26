@@ -17,11 +17,8 @@ export class WhatsAppService {
         const apiUrl = this.configService.get<string>('WHATSAPP_API_URL')?.trim();
         const apiKey = this.configService.get<string>('WHATSAPP_API_KEY')?.trim();
 
-        console.log(apiKey);
-        console.log(apiUrl);
-
         if (!apiUrl || !apiKey) {
-            console.warn('WhatsApp no configurado. Se omite el envio del mensaje.');
+            this.logger.warn('WhatsApp no configurado. Se omite el envio del mensaje.');
             return false;
         }
 
@@ -29,13 +26,9 @@ export class WhatsAppService {
         const toPhoneNumber = this.normalizePhoneNumber(input.toPhoneNumber);
 
         if (!fromPhoneNumber || !toPhoneNumber) {
-            console.warn('No se pudo enviar WhatsApp por numeros invalidos.');
+            this.logger.warn('No se pudo enviar WhatsApp por numeros invalidos.');
             return false;
         }
-
-        console.log("Numero de origen:", fromPhoneNumber);
-        console.log("Numero de destino:", toPhoneNumber);
-        console.log("Mensaje:", input.message);
 
         try {
             const response = await fetch(apiUrl, {
@@ -55,13 +48,13 @@ export class WhatsAppService {
 
             const responseText = await response.text();
 
-            console.log(`WhatsApp status: ${response.status}`);
-            console.log(`WhatsApp response: ${responseText}`);
+            this.logger.log(`WhatsApp status: ${response.status}`);
+            this.logger.debug(`WhatsApp response: ${responseText}`);
 
             return response.ok;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-            console.error(`Error enviando WhatsApp: ${errorMessage}`);
+            this.logger.error(`Error enviando WhatsApp: ${errorMessage}`);
             return false;
         }
     }

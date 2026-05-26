@@ -40,18 +40,19 @@ export class Client extends AuditEntity {
 
     @Column({
         type: 'enum',
-        enum: DocumentType
+        enum: DocumentType,
+        nullable: true,
     })
-    documentType!: DocumentType;
+    documentType?: DocumentType | null;
 
-    @Column()
-    documentNumber!: string;
+    @Column({ nullable: true })
+    documentNumber?: string | null;
 
-    @Column()
-    address!: string;
+    @Column({ nullable: true })
+    address?: string | null;
 
-    @Column()
-    birthDate!: Date;
+    @Column({ nullable: true })
+    birthDate?: Date | null;
 
     @ManyToOne(() => Company, (company) => company.clients, { nullable: false, onDelete: 'CASCADE' })
     @JoinColumn({ name: 'companyId' })

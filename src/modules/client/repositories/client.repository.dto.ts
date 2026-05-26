@@ -14,8 +14,14 @@ export class ClientRepository {
         private readonly clientRepo: Repository<Client>,
     ) { }
 
+    private removeUndefinedFields<T extends object>(data: T): Partial<T> {
+        return Object.fromEntries(
+            Object.entries(data).filter(([, value]) => value !== undefined),
+        ) as Partial<T>;
+    }
+
     async createUser(data: Partial<Client>, tenantId: string): Promise<Client> {
-        const {  ...userData } = data;
+        const userData = this.removeUndefinedFields(data);
 
         const client = this.clientRepo.create({
             ...userData,
@@ -59,22 +65,30 @@ export class ClientRepository {
     }
 
     async findByDocumentNumber(documentNumber: string, tenantId: string) {
+        if (!documentNumber) return null;
         return this.clientRepo.findOne({
             where: { documentNumber, status: ClientStatus.ACTIVE, company: { id: tenantId } },
         });
     }
 
     async findAnyByDocumentNumber(documentNumber: string, tenantId: string) {
+        if (!documentNumber) return null;
         return this.clientRepo.findOne({
             where: { documentNumber, company: { id: tenantId } },
         });
     }
 
     async upsertByDocumentNumber(data: Partial<Client>, tenantId: string): Promise<Client> {
-        const client = await this.findAnyByDocumentNumber(data.documentNumber!, tenantId);
+        const normalizedData = this.removeUndefinedFields(data);
+
+        if (!normalizedData.documentNumber) {
+            return this.createUser(normalizedData, tenantId);
+        }
+
+        const client = await this.findAnyByDocumentNumber(normalizedData.documentNumber, tenantId);
 
         if (client) {
-            Object.assign(client, data, {
+            Object.assign(client, normalizedData, {
                 status: ClientStatus.ACTIVE,
             });
 
@@ -86,7 +100,7 @@ export class ClientRepository {
             return full ?? saved;
         }
 
-        return this.createUser(data, tenantId);
+        return this.createUser(normalizedData, tenantId);
     }
 
     async updateByDocumentNumber(
@@ -166,6 +180,9 @@ export class ClientRepository {
     }
 
     async validateByDocumentNumber(documentNumber: string, tenantId: string, excludeUserId?: string): Promise<boolean> {
+        if (!documentNumber) {
+            return false;
+        }
         const client = await this.clientRepo.findOne({
             where: {
                 documentNumber,

@@ -7,42 +7,46 @@ export class PublicCreateAppointmentDto {
     @IsNotEmpty()
     @MaxLength(50)
     @ApiProperty()
-    clientName: string;
+    clientName!: string;
 
     @IsString()
     @IsEmail()
     @MaxLength(200)
     @ApiProperty()
-    clientEmail: string;
+    clientEmail!: string;
 
     @IsString()
     @IsNumberString()
     @MaxLength(20)
     @ApiProperty()
-    clientPhone: string;
+    clientPhone!: string;
 
     @IsEnum(DocumentType)
-    @ApiProperty({ enum: DocumentType })
-    documentType: DocumentType;
+    @IsOptional()
+    @ApiProperty({ enum: DocumentType, required: false, nullable: true })
+    documentType?: DocumentType;
 
     @IsString()
     @IsNumberString()
     @MaxLength(20)
-    @ApiProperty()
-    documentNumber: string;
+    @IsOptional()
+    @ApiProperty({ required: false, nullable: true })
+    documentNumber?: string;
 
     @IsString()
     @MaxLength(200)
-    @ApiProperty()
-    address: string;
+    @IsOptional()
+    @ApiProperty({ required: false, nullable: true })
+    address?: string;
 
     @IsDateString()
-    @ApiProperty({ example: '1990-01-01' })
-    birthDate: string;
+    @IsOptional()
+    @ApiProperty({ example: '1990-01-01', required: false, nullable: true })
+    birthDate?: string;
 
     @IsUUID()
     @ApiProperty()
-    serviceId: string;
+    serviceId!: string;
 
     @IsUUID()
     @IsOptional()
@@ -51,7 +55,7 @@ export class PublicCreateAppointmentDto {
 
     @IsDateString()
     @ApiProperty({ example: '2026-03-24T14:00:00Z' })
-    scheduledAt: string;
+    scheduledAt!: string;
 
     @IsInt()
     @Min(1)

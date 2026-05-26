@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsEmail, IsEnum, IsNotEmpty, IsNumberString, IsString, MaxLength } from "class-validator";
+import { IsDateString, IsEmail, IsEnum, IsNotEmpty, IsNumberString, IsOptional, IsString, MaxLength } from "class-validator";
 import { DocumentType } from "../entity/client.entity";
 
 export class CreateClientDto {
@@ -23,23 +23,26 @@ export class CreateClientDto {
     phone: string;
 
     @IsEnum(DocumentType)
-    @ApiProperty({ enum: DocumentType })
-    documentType: DocumentType;
+    @IsOptional()
+    @ApiProperty({ enum: DocumentType, required: false, nullable: true })
+    documentType?: DocumentType;
 
     @IsString()
     @IsNumberString()
     @MaxLength(20)
-    @ApiProperty()
-    documentNumber: string;
+    @IsOptional()
+    @ApiProperty({ required: false, nullable: true })
+    documentNumber?: string;
 
     @IsString()
     @MaxLength(200)
-    @ApiProperty()
-    address: string;
+    @IsOptional()
+    @ApiProperty({ required: false, nullable: true })
+    address?: string;
     
-    @IsString()
-    @MaxLength(200)
-    @ApiProperty()
-    birthDate: Date;
+    @IsDateString()
+    @IsOptional()
+    @ApiProperty({ required: false, nullable: true, example: '1990-01-01' })
+    birthDate?: Date;
 
 }
