@@ -43,16 +43,16 @@ export class Client extends AuditEntity {
         enum: DocumentType,
         nullable: true,
     })
-    documentType?: DocumentType | null;
+    documentType?: DocumentType;
 
-    @Column({ nullable: true })
-    documentNumber?: string | null;
+    @Column({ type: 'varchar', nullable: true })
+    documentNumber?: string;
 
-    @Column({ nullable: true })
-    address?: string | null;
+    @Column({ type: 'varchar', nullable: true })
+    address?: string;
 
-    @Column({ nullable: true })
-    birthDate?: Date | null;
+    @Column({ type: 'timestamp', nullable: true })
+    birthDate?: Date;
 
     @ManyToOne(() => Company, (company) => company.clients, { nullable: false, onDelete: 'CASCADE' })
     @JoinColumn({ name: 'companyId' })
