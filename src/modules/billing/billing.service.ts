@@ -32,7 +32,9 @@ export class BillingService {
                 company: { id: tenantId },
                 employee: { id: filter.employeeId },
                 status: CommissionStatus.PENDING,
-                CreatedAt: Between(start, end),
+                appointment: {
+                    scheduledAt: Between(start, end),
+                },
             } as any,
         });
 
@@ -49,7 +51,9 @@ export class BillingService {
                 company: { id: tenantId },
                 employee: { id: dto.employeeId },
                 status: CommissionStatus.PENDING,
-                CreatedAt: Between(start, end),
+                appointment: {
+                    scheduledAt: Between(start, end),
+                },
             } as any,
         });
 
@@ -114,7 +118,7 @@ export class BillingService {
                 liquidation: { id: liquidationId },
             },
             relations: ['appointment'],
-            order: { CreatedAt: 'ASC' },
+            order: { appointment: { scheduledAt: 'ASC' } } as any,
         });
 
         return BillingMapper.toCommissionList(commissions);
