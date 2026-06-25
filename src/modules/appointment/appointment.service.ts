@@ -55,13 +55,14 @@ export class AppointmentService {
         if (!service) throw new BadRequestException('Servicio no encontrado');
 
         let employee: User | null = null;
+        let employeeServiceAssignment: EmployeeService | null = null;
         if (dto.employeeId) {
             employee = await this.userRepo.findOne({
                 where: { id: dto.employeeId, role: UserRole.EMPLOYEE, status: UserStatus.ACTIVE, company: { id: tenantId } },
                 relations: ['employeeSchedules'],
             });
             if (!employee) throw new BadRequestException('Empleado no encontrado');
-            await this.ensureEmployeeCanPerformService(employee.id, dto.serviceId, tenantId);
+            employeeServiceAssignment = await this.ensureEmployeeCanPerformService(employee.id, dto.serviceId, tenantId);
             await this.ensureEmployeeIsAvailable(
                 employee,
                 tenantId,
@@ -80,7 +81,7 @@ export class AppointmentService {
         appointment.notes = dto.notes;
         appointment.status = AppointmentStatus.PENDING;
         appointment.servicePrice = Number(service.price);
-        appointment.commissionRate = Number(service.commissionRate ?? 0);
+        appointment.commissionRate = this.resolveAppointmentCommissionRate(service, employeeServiceAssignment);
         appointment.createdBy = authorId;
         appointment.updatedBy = authorId;
 
@@ -103,13 +104,14 @@ export class AppointmentService {
         if (!service) throw new BadRequestException('Servicio no encontrado');
 
         let employee: User | null = null;
+        let employeeServiceAssignment: EmployeeService | null = null;
         if (dto.employeeId) {
             employee = await this.userRepo.findOne({
                 where: { id: dto.employeeId, role: UserRole.EMPLOYEE, status: UserStatus.ACTIVE, company: { id: tenantId } },
                 relations: ['employeeSchedules'],
             });
             if (!employee) throw new BadRequestException('Empleado no encontrado');
-            await this.ensureEmployeeCanPerformService(employee.id, dto.serviceId, tenantId);
+            employeeServiceAssignment = await this.ensureEmployeeCanPerformService(employee.id, dto.serviceId, tenantId);
             await this.ensureEmployeeIsAvailable(
                 employee,
                 tenantId,
@@ -138,7 +140,7 @@ export class AppointmentService {
         appointment.notes = dto.notes;
         appointment.status = AppointmentStatus.PENDING;
         appointment.servicePrice = Number(service.price);
-        appointment.commissionRate = Number(service.commissionRate ?? 0);
+        appointment.commissionRate = this.resolveAppointmentCommissionRate(service, employeeServiceAssignment);
 
         const saved = await this.appointmentRepo.save(appointment);
         await this.sendPublicAppointmentConfirmation({
@@ -237,7 +239,7 @@ export class AppointmentService {
         return this.commissionRepo.save(commission);
     }
 
-    private async ensureEmployeeCanPerformService(employeeId: string, serviceId: string, tenantId: string) {
+    private async ensureEmployeeCanPerformService(employeeId: string, serviceId: string, tenantId: string): Promise<EmployeeService> {
         const assignment = await this.employeeServiceRepo.findOne({
             where: {
                 employee: { id: employeeId, role: UserRole.EMPLOYEE, status: UserStatus.ACTIVE, company: { id: tenantId } },
@@ -248,6 +250,14 @@ export class AppointmentService {
         if (!assignment) {
             throw new BadRequestException('El empleado no tiene asignado este servicio');
         }
+
+        return assignment;
+    }
+
+    private resolveAppointmentCommissionRate(service: ServiceItem, assignment?: EmployeeService | null): number {
+        const baseCommissionRate = Number(service.commissionRate ?? 0);
+        const extraCommissionRate = Number(assignment?.extraCommissionRate ?? 0);
+        return Number((baseCommissionRate + extraCommissionRate).toFixed(2));
     }
 
     private async ensureEmployeeIsAvailable(employee: User, tenantId: string, scheduledAt: Date, durationMinutes: number) {

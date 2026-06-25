@@ -8,14 +8,14 @@ import { UserMapper } from "../user.mapper";
 import { ServiceItem, ServiceItemStatus } from "src/modules/service-item/entity/service-item.entity";
 import { EmployeeService } from "../entity/employee-service.entity";
 import { EmployeeSchedule, EmployeeScheduleDay } from "../entity/employee-schedule.entity";
-import { ResponseServiceItemDto } from "src/modules/service-item/dto/response-service-item.dto";
-import { ServiceItemMapper } from "src/modules/service-item/service-item.mapper";
+import { EmployeeServiceAssignmentInputDto } from "../dto/employee-service-assignment-input.dto";
 import { PublicEmployeeDto } from "../dto/public-employee.dto";
 import { EmployeeScheduleInputDto } from "../dto/set-employee-schedules.dto";
 import { ResponseEmployeeScheduleDto } from "../dto/response-employee-schedule.dto";
 import { MediaService } from "src/modules/media/media.service";
 import { Session } from "src/modules/session/entity/session.entity";
 import { ResponsePasswordResetUserDto } from "../dto/response-password-reset-user.dto";
+import { ResponseEmployeeServiceAssignmentDto } from "../dto/response-employee-service-assignment.dto";
 
 type UserWriteInput = Omit<Partial<User>, 'imageId'> & {
     imageId?: string | null;
@@ -73,7 +73,7 @@ export class UserRepository {
 
         const full = await this.userRepo.findOne({
             where: { id: saved.id },
-            relations: ['company', 'image', 'employeeServices', 'employeeServices.service'],
+            relations: ['company', 'image', 'employeeServices', 'employeeServices.service', 'employeeServices.service.image'],
         });
 
         return UserMapper.toResponse(full ?? saved);
@@ -82,7 +82,7 @@ export class UserRepository {
     async findAll(tenantId?: string): Promise<ResponseUserDto[]> {
         const users = await this.userRepo.find({
             where: { status: UserStatus.ACTIVE, ...(tenantId ? { company: { id: tenantId } } : {}) },
-            relations: ['company', 'image', 'employeeServices', 'employeeServices.service'],
+            relations: ['company', 'image', 'employeeServices', 'employeeServices.service', 'employeeServices.service.image'],
         });
         return UserMapper.toResponseList(users);
     }
@@ -109,7 +109,7 @@ export class UserRepository {
     async findById(id: string, tenantId?: string): Promise<ResponseUserDto> {
         const user = await this.userRepo.findOne({
             where: { id, status: UserStatus.ACTIVE, ...(tenantId ? { company: { id: tenantId } } : {}) },
-            relations: ['company', 'image', 'employeeServices', 'employeeServices.service'],
+            relations: ['company', 'image', 'employeeServices', 'employeeServices.service', 'employeeServices.service.image'],
         });
 
         if (!user) {
@@ -236,7 +236,7 @@ export class UserRepository {
 
         const full = await this.userRepo.findOne({
             where: { id: saved.id },
-            relations: ['company', 'image', 'employeeServices', 'employeeServices.service'],
+            relations: ['company', 'image', 'employeeServices', 'employeeServices.service', 'employeeServices.service.image'],
         });
 
         return UserMapper.toResponse(full ?? saved);
@@ -295,16 +295,17 @@ export class UserRepository {
         return !!user;
     }
 
-    async findEmployeeServices(id: string, tenantId?: string): Promise<ResponseServiceItemDto[]> {
+    async findEmployeeServices(id: string, tenantId?: string): Promise<ResponseEmployeeServiceAssignmentDto[]> {
         const employee = await this.getEmployeeById(id, tenantId);
-        const services = (employee.employeeServices ?? [])
-            .map((employeeService) => employeeService.service)
-            .filter((service): service is ServiceItem => !!service && service.status === ServiceItemStatus.ACTIVE);
-
-        return ServiceItemMapper.toResponseList(services);
+        return this.toEmployeeServiceAssignmentResponseList(employee.employeeServices ?? []);
     }
 
-    async setEmployeeServices(id: string, serviceIds: string[], authorId: string, tenantId?: string): Promise<ResponseServiceItemDto[]> {
+    async setEmployeeServices(
+        id: string,
+        serviceAssignments: EmployeeServiceAssignmentInputDto[],
+        authorId: string,
+        tenantId?: string,
+    ): Promise<ResponseEmployeeServiceAssignmentDto[]> {
         const employee = await this.getEmployeeById(id, tenantId);
         const companyId = employee.companyId ?? employee.company?.id;
 
@@ -312,44 +313,49 @@ export class UserRepository {
             throw new BadRequestException('El empleado no tiene empresa asociada');
         }
 
-        const normalizedServiceIds = [...new Set(serviceIds)];
+        const normalizedServices = this.normalizeEmployeeServiceAssignments(serviceAssignments);
 
-        if (normalizedServiceIds.length === 0) {
+        if (normalizedServices.length === 0) {
             await this.employeeServiceRepo.delete({ employee: { id: employee.id } } as any);
             return [];
         }
 
-        const services = await this.serviceRepo.find({
+        const companyServices = await this.serviceRepo.find({
             where: {
-                id: In(normalizedServiceIds),
+                id: In(normalizedServices.map((service) => service.serviceId)),
                 status: ServiceItemStatus.ACTIVE,
                 company: { id: companyId },
             },
+            relations: ['image'],
         });
 
-        if (services.length !== normalizedServiceIds.length) {
+        if (companyServices.length !== normalizedServices.length) {
             throw new BadRequestException('Uno o mas servicios no existen o no pertenecen al empleado');
         }
 
         await this.employeeServiceRepo.delete({ employee: { id: employee.id } } as any);
 
-        const serviceMap = new Map(services.map((service) => [service.id, service]));
-        const assignments = normalizedServiceIds.map((serviceId) =>
-            this.employeeServiceRepo.create({
+        const serviceMap = new Map(companyServices.map((service) => [service.id, service]));
+        const assignmentEntities = normalizedServices.map((item) => {
+            const service = serviceMap.get(item.serviceId);
+            return this.employeeServiceRepo.create({
                 employee: { id: employee.id } as any,
-                service: { id: serviceId } as any,
+                service: service ?? ({ id: item.serviceId } as any),
+                extraCommissionRate: Number(item.extraCommissionRate ?? 0),
                 createdBy: authorId,
                 updatedBy: authorId,
-            }),
-        );
+            });
+        });
 
-        await this.employeeServiceRepo.save(assignments);
+        const savedAssignments = await this.employeeServiceRepo.save(assignmentEntities);
+        const orderedAssignments = normalizedServices.map((item, index) => {
+            const assignment = savedAssignments[index];
+            assignment.service = serviceMap.get(item.serviceId)!;
+            assignment.serviceId = item.serviceId;
+            return assignment;
+        });
 
-        const orderedServices = normalizedServiceIds
-            .map((serviceId) => serviceMap.get(serviceId))
-            .filter((service): service is ServiceItem => !!service);
-
-        return ServiceItemMapper.toResponseList(orderedServices);
+        return this.toEmployeeServiceAssignmentResponseList(orderedAssignments);
     }
 
     async findEmployeeSchedules(id: string, tenantId?: string): Promise<ResponseEmployeeScheduleDto[]> {
@@ -405,7 +411,7 @@ export class UserRepository {
                 status: UserStatus.ACTIVE,
                 ...(tenantId ? { company: { id: tenantId } } : {}),
             },
-            relations: ['company', 'employeeServices', 'employeeServices.service'],
+            relations: ['company', 'employeeServices', 'employeeServices.service', 'employeeServices.service.image'],
         });
 
         if (!employee) {
@@ -494,6 +500,51 @@ export class UserRepository {
             status: user.status,
             companyId: user.companyId ?? user.company?.id,
             companyName: user.company?.name,
+        };
+    }
+
+    private normalizeEmployeeServiceAssignments(
+        services: EmployeeServiceAssignmentInputDto[],
+    ): EmployeeServiceAssignmentInputDto[] {
+        const normalizedServices = services.map((service) => ({
+            serviceId: service.serviceId,
+            extraCommissionRate: Number(service.extraCommissionRate ?? 0),
+        }));
+
+        const uniqueServiceIds = new Set(normalizedServices.map((service) => service.serviceId));
+        if (uniqueServiceIds.size !== normalizedServices.length) {
+            throw new BadRequestException('No se puede repetir el mismo servicio para un empleado');
+        }
+
+        return normalizedServices;
+    }
+
+    private toEmployeeServiceAssignmentResponseList(
+        employeeServices: EmployeeService[],
+    ): ResponseEmployeeServiceAssignmentDto[] {
+        return employeeServices
+            .filter((employeeService) => !!employeeService.service)
+            .map((employeeService) => this.toEmployeeServiceAssignmentResponse(employeeService));
+    }
+
+    private toEmployeeServiceAssignmentResponse(
+        employeeService: EmployeeService,
+    ): ResponseEmployeeServiceAssignmentDto {
+        const service = employeeService.service;
+        const baseCommissionRate = Number(service.commissionRate ?? 0);
+        const extraCommissionRate = Number(employeeService.extraCommissionRate ?? 0);
+
+        return {
+            serviceId: employeeService.serviceId ?? service.id,
+            serviceName: service.name,
+            price: Number(service.price),
+            durationMinutes: service.durationMinutes,
+            baseCommissionRate,
+            extraCommissionRate,
+            totalCommissionRate: Number((baseCommissionRate + extraCommissionRate).toFixed(2)),
+            imageId: service.imageId ?? service.image?.id,
+            imageUrl: service.image?.url,
+            status: service.status,
         };
     }
 

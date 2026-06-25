@@ -11,12 +11,12 @@ import { UserService } from './user.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserRole } from './entity/user.entity';
 import { SetEmployeeServicesDto } from './dto/set-employee-services.dto';
-import { ResponseServiceItemDto } from '../service-item/dto/response-service-item.dto';
 import { SetEmployeeSchedulesDto } from './dto/set-employee-schedules.dto';
 import { ResponseEmployeeScheduleDto } from './dto/response-employee-schedule.dto';
 import { SearchPasswordResetUserDto } from './dto/search-password-reset-user.dto';
 import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
 import { ResponsePasswordResetUserDto } from './dto/response-password-reset-user.dto';
+import { ResponseEmployeeServiceAssignmentDto } from './dto/response-employee-service-assignment.dto';
 
 @Controller('user')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -95,7 +95,7 @@ export class UserController {
     }
 
     @Get(':id/services')
-    @ApiOkWrappedArray(ResponseServiceItemDto, 'Servicios del empleado')
+    @ApiOkWrappedArray(ResponseEmployeeServiceAssignmentDto, 'Servicios del empleado')
     @ApiCommonErrors()
     @Roles('SUPER_ADMIN', 'ADMIN')
     findServices(@Param('id') id: string, @Request() req) {
@@ -110,7 +110,7 @@ export class UserController {
     }
 
     @Put(':id/services')
-    @ApiOkWrappedArray(ResponseServiceItemDto, 'Servicios del empleado actualizados')
+    @ApiOkWrappedArray(ResponseEmployeeServiceAssignmentDto, 'Servicios del empleado actualizados')
     @ApiCommonErrors()
     @Roles('SUPER_ADMIN', 'ADMIN')
     setServices(@Param('id') id: string, @Body() dto: SetEmployeeServicesDto, @Request() req) {
@@ -121,7 +121,7 @@ export class UserController {
                 throw new BadRequestException('Empresa no coincide con la sesion activa');
             }
         }
-        return this.service.setServices(id, dto.serviceIds, req.user.id, tenantId);
+        return this.service.setServices(id, dto, req.user.id, tenantId);
     }
 
     @Get(':id/schedules')

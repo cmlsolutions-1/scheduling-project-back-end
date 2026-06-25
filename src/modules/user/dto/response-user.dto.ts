@@ -1,6 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsEmail, IsEnum, IsNotEmpty, IsString, MaxLength } from "class-validator";
 import { UserRole, UserStatus } from "../entity/user.entity";
+import { ResponseEmployeeServiceAssignmentDto } from "./response-employee-service-assignment.dto";
 
 
 export class ResponseUserDto {
@@ -46,4 +47,7 @@ export class ResponseUserDto {
 
     @ApiProperty({ type: [String], required: false })
     serviceIds?: string[];
+
+    @ApiProperty({ type: [ResponseEmployeeServiceAssignmentDto], required: false })
+    services?: ResponseEmployeeServiceAssignmentDto[];
 }

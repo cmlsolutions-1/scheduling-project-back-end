@@ -1,11 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
+import { EmployeeServiceAssignmentInputDto } from './dto/employee-service-assignment-input.dto';
 import { UserRepository } from './repositories/user.repository.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { ResponseServiceItemDto } from '../service-item/dto/response-service-item.dto';
 import { PublicEmployeeDto } from './dto/public-employee.dto';
 import { EmployeeScheduleInputDto } from './dto/set-employee-schedules.dto';
 import { ResponseEmployeeScheduleDto } from './dto/response-employee-schedule.dto';
+import { ResponseEmployeeServiceAssignmentDto } from './dto/response-employee-service-assignment.dto';
+import { SetEmployeeServicesDto } from './dto/set-employee-services.dto';
 import { ResponsePasswordResetUserDto } from './dto/response-password-reset-user.dto';
 
 @Injectable()
@@ -43,12 +45,12 @@ export class UserService {
         return await this.repository.activeUser(id, authorId, tenantId);
     }
 
-    async findServices(id: string, tenantId?: string): Promise<ResponseServiceItemDto[]> {
+    async findServices(id: string, tenantId?: string): Promise<ResponseEmployeeServiceAssignmentDto[]> {
         return await this.repository.findEmployeeServices(id, tenantId);
     }
 
-    async setServices(id: string, serviceIds: string[], authorId: string, tenantId?: string): Promise<ResponseServiceItemDto[]> {
-        return await this.repository.setEmployeeServices(id, serviceIds, authorId, tenantId);
+    async setServices(id: string, dto: SetEmployeeServicesDto, authorId: string, tenantId?: string): Promise<ResponseEmployeeServiceAssignmentDto[]> {
+        return await this.repository.setEmployeeServices(id, this.normalizeEmployeeServiceAssignments(dto), authorId, tenantId);
     }
 
     async findSchedules(id: string, tenantId?: string): Promise<ResponseEmployeeScheduleDto[]> {
@@ -80,5 +82,27 @@ export class UserService {
             throw new BadRequestException('El numero de telefono del usuario ya esta en uso');
         }
 
+    }
+
+    private normalizeEmployeeServiceAssignments(dto: SetEmployeeServicesDto): EmployeeServiceAssignmentInputDto[] {
+        const hasServices = Array.isArray(dto.services);
+        const hasServiceIds = Array.isArray(dto.serviceIds);
+
+        if (hasServices && hasServiceIds) {
+            throw new BadRequestException('Debe enviar services o serviceIds, pero no ambos');
+        }
+
+        if (hasServices) {
+            return dto.services ?? [];
+        }
+
+        if (hasServiceIds) {
+            return (dto.serviceIds ?? []).map((serviceId) => ({
+                serviceId,
+                extraCommissionRate: 0,
+            }));
+        }
+
+        throw new BadRequestException('Debe enviar services o serviceIds');
     }
 }

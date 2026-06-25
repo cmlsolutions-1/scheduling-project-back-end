@@ -10,6 +10,7 @@ type SendWhatsAppMessageInput = {
 @Injectable()
 export class WhatsAppService {
     private readonly logger = new Logger(WhatsAppService.name);
+    private static readonly INFORMATIVE_FOOTER = '\n\n\u{26A0} *Este es un mensaje informativo.*\nPor favor no responder este mensaje.';
 
     constructor(private readonly configService: ConfigService) { }
 
@@ -31,6 +32,8 @@ export class WhatsAppService {
         }
 
         try {
+            const message = this.appendInformativeFooter(input.message);
+
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
@@ -40,7 +43,7 @@ export class WhatsAppService {
                 body: JSON.stringify({
                     fromPhoneNumber,
                     toPhoneNumber,
-                    message: input.message,
+                    message,
                 }),
             });
 
@@ -62,5 +65,16 @@ export class WhatsAppService {
     private normalizePhoneNumber(value?: string | null): string | null {
         const normalized = value?.replace(/\D/g, '') ?? '';
         return normalized.length ? normalized : null;
+    }
+
+    private appendInformativeFooter(message: string): string {
+        const normalizedMessage = message.trimEnd();
+        const footerText = 'por favor no responder este mensaje';
+
+        if (normalizedMessage.toLowerCase().includes(footerText)) {
+            return normalizedMessage;
+        }
+
+        return `${normalizedMessage}${WhatsAppService.INFORMATIVE_FOOTER}`;
     }
 }
