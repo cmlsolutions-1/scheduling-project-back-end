@@ -14,6 +14,6 @@ export class PublicServiceItemController {
     @ApiOkWrappedArray(ResponseServiceItemDto, 'Servicios publicos')
     @ApiCommonErrors()
     findPublic(@Request() req) {
-        return this.service.findAll(req.tenant.id);
+        return this.service.findAllActive(req.tenant.id);
     }
 }

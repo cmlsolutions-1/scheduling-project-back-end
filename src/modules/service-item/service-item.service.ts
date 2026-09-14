@@ -15,6 +15,10 @@ export class ServiceItemService {
         return this.repository.findAll(tenantId);
     }
 
+    findAllActive(tenantId: string) {
+        return this.repository.findAllActive(tenantId);
+    }
+
     findOne(id: string, tenantId: string) {
         return this.repository.findById(id, tenantId);
     }

@@ -39,7 +39,15 @@ export class ServiceItemRepository {
 
     async findAll(tenantId: string): Promise<ResponseServiceItemDto[]> {
         const services = await this.serviceRepo.find({
-            where: { status: ServiceItemStatus.ACTIVE, company: { id: tenantId } },
+            where: { company: { id: tenantId } },
+            relations: ['image'],
+        });
+        return ServiceItemMapper.toResponseList(services);
+    }
+
+    async findAllActive(tenantId: string): Promise<ResponseServiceItemDto[]> {
+        const services = await this.serviceRepo.find({
+            where: { company: { id: tenantId }, status: ServiceItemStatus.ACTIVE },
             relations: ['image'],
         });
         return ServiceItemMapper.toResponseList(services);
