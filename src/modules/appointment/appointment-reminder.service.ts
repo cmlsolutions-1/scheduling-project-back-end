@@ -103,8 +103,8 @@ export class AppointmentReminderService implements OnModuleInit, OnModuleDestroy
         const companyName = appointment.company.name;
         const serviceName = appointment.service.name;
         const employeeName = appointment.employee?.name;
-        const scheduledDate = this.formatDate(appointment.scheduledAt);
-        const scheduledTime = this.formatTime(appointment.scheduledAt);
+        const scheduledDate = this.formatDate(appointment.scheduledAt, appointment.company.timeZone);
+        const scheduledTime = this.formatTime(appointment.scheduledAt, appointment.company.timeZone);
         const employeeLine = employeeName ? `\n\u{1F487} Profesional: *${employeeName}*` : '';
 
         const messages = [
@@ -118,16 +118,18 @@ export class AppointmentReminderService implements OnModuleInit, OnModuleDestroy
         return messages[Math.floor(Math.random() * messages.length)];
     }
 
-    private formatDate(value: Date): string {
+    private formatDate(value: Date, timeZone: string): string {
         return new Intl.DateTimeFormat('es-CO', {
+            timeZone,
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
         }).format(new Date(value));
     }
 
-    private formatTime(value: Date): string {
+    private formatTime(value: Date, timeZone: string): string {
         return new Intl.DateTimeFormat('es-CO', {
+            timeZone,
             hour: '2-digit',
             minute: '2-digit',
             hour12: true,

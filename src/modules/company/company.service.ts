@@ -2,13 +2,17 @@ import { Injectable } from '@nestjs/common';
 import { CompanyRepository } from './repositories/company.repository';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
+import { canonicalizeIanaTimeZone } from '../common/utils/time-zone.util';
 
 @Injectable()
 export class CompanyService {
     constructor(private readonly repository: CompanyRepository) {}
 
     create(dto: CreateCompanyDto, authorId: string) {
-        return this.repository.createCompany(dto, authorId);
+        return this.repository.createCompany({
+            ...dto,
+            timeZone: canonicalizeIanaTimeZone(dto.timeZone),
+        }, authorId);
     }
 
     findAll() {
@@ -28,7 +32,10 @@ export class CompanyService {
     }
 
     update(id: string, dto: UpdateCompanyDto, authorId: string) {
-        return this.repository.updateCompany(id, dto, authorId);
+        return this.repository.updateCompany(id, {
+            ...dto,
+            ...(dto.timeZone ? { timeZone: canonicalizeIanaTimeZone(dto.timeZone) } : {}),
+        }, authorId);
     }
 
     remove(id: string, authorId: string) {

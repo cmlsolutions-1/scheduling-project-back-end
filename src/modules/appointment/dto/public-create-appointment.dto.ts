@@ -1,7 +1,8 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
-import { IsDateString, IsEmail, IsEnum, IsNotEmpty, IsNumberString, IsOptional, IsString, IsUUID, MaxLength, Min, IsInt } from "class-validator";
+import { IsDateString, IsEmail, IsEnum, IsNotEmpty, IsNumberString, IsOptional, IsString, IsUUID, MaxLength, Min, IsInt, Matches } from "class-validator";
 import { DocumentType } from "src/modules/client/entity/client.entity";
+import { IsIanaTimeZone } from "src/modules/common/validators/is-iana-time-zone.validator";
 
 export class PublicCreateAppointmentDto {
     @IsString()
@@ -59,8 +60,27 @@ export class PublicCreateAppointmentDto {
     employeeId?: string;
 
     @IsDateString()
-    @ApiProperty({ example: '2026-03-24T14:00:00Z' })
-    scheduledAt!: string;
+    @IsOptional()
+    @ApiProperty({ required: false, example: '2026-09-21T15:00:00.000Z', description: 'Formato UTC legado; prefiera los campos locales' })
+    scheduledAt?: string;
+
+    @IsString()
+    @IsOptional()
+    @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'scheduledLocalDate debe tener formato YYYY-MM-DD' })
+    @ApiProperty({ required: false, example: '2026-09-21' })
+    scheduledLocalDate?: string;
+
+    @IsString()
+    @IsOptional()
+    @Matches(/^(?:[01]\d|2[0-3]):[0-5]\d$/, { message: 'scheduledLocalTime debe tener formato HH:mm' })
+    @ApiProperty({ required: false, example: '10:00' })
+    scheduledLocalTime?: string;
+
+    @IsString()
+    @IsOptional()
+    @IsIanaTimeZone()
+    @ApiProperty({ required: false, example: 'America/Bogota' })
+    timeZone?: string;
 
     @IsInt()
     @Min(1)

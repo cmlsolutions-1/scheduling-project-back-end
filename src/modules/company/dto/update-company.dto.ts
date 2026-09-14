@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsOptional, IsString, MaxLength } from "class-validator";
+import { IsIanaTimeZone } from "src/modules/common/validators/is-iana-time-zone.validator";
 
 export class UpdateCompanyDto {
     @IsString()
@@ -25,4 +26,11 @@ export class UpdateCompanyDto {
     @MaxLength(30)
     @ApiProperty({ required: false })
     whatsappPhoneNumber?: string;
+
+    @IsString()
+    @IsOptional()
+    @IsIanaTimeZone()
+    @MaxLength(100)
+    @ApiProperty({ required: false, example: 'America/Bogota', description: 'Zona horaria IANA de la empresa' })
+    timeZone?: string;
 }

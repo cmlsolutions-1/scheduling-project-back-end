@@ -18,7 +18,7 @@ export class Appointment extends AuditEntity {
     @PrimaryGeneratedColumn('uuid')
     id!: string;
 
-    @Column({ type: 'timestamp' })
+    @Column({ type: 'timestamptz' })
     scheduledAt!: Date;
 
     @Column({ type: 'int', nullable: true })

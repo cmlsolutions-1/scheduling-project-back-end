@@ -1,11 +1,17 @@
 import { ResponseAppointmentDto } from "./dto/response-appointment.dto";
 import { Appointment } from "./entity/appointment.entity";
+import { canonicalizeIanaTimeZone, utcToZonedDateTime } from "../common/utils/time-zone.util";
 
 export class AppointmentMapper {
-    static toResponse(appointment: Appointment): ResponseAppointmentDto {
+    static toResponse(appointment: Appointment, timeZone: string): ResponseAppointmentDto {
+        const canonicalTimeZone = canonicalizeIanaTimeZone(timeZone);
+        const localDateTime = utcToZonedDateTime(appointment.scheduledAt, canonicalTimeZone);
         return {
             id: appointment.id,
             scheduledAt: appointment.scheduledAt,
+            scheduledLocalDate: localDateTime.date,
+            scheduledLocalTime: localDateTime.time,
+            timeZone: canonicalTimeZone,
             durationMinutes: appointment.durationMinutes ?? undefined,
             notes: appointment.notes ?? undefined,
             status: appointment.status,
@@ -21,6 +27,6 @@ export class AppointmentMapper {
     }
 
     static toResponseList(appointments: Appointment[]): ResponseAppointmentDto[] {
-        return appointments.map((appointment) => this.toResponse(appointment));
+        return appointments.map((appointment) => this.toResponse(appointment, appointment.company.timeZone));
     }
 }

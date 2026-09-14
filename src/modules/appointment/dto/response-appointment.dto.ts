@@ -8,6 +8,15 @@ export class ResponseAppointmentDto {
     @ApiProperty()
     scheduledAt: Date;
 
+    @ApiProperty({ example: '2026-09-21' })
+    scheduledLocalDate: string;
+
+    @ApiProperty({ example: '10:00' })
+    scheduledLocalTime: string;
+
+    @ApiProperty({ example: 'America/Bogota' })
+    timeZone: string;
+
     @ApiProperty({ required: false })
     durationMinutes?: number;
 

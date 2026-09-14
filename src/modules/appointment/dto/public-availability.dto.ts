@@ -12,6 +12,9 @@ export class PublicAvailabilityDto {
     @ApiProperty({ example: '2026-03-26' })
     date: string;
 
+    @ApiProperty({ example: 'America/Bogota' })
+    timeZone: string;
+
     @ApiProperty()
     employeeId: string;
 

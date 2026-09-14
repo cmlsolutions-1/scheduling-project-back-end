@@ -17,6 +17,9 @@ export class ResponseCompanyDto {
     @ApiProperty({ required: false })
     whatsappPhoneNumber?: string;
 
+    @ApiProperty({ example: 'America/Bogota' })
+    timeZone: string;
+
     @ApiProperty({ enum: CompanyStatus })
     status: CompanyStatus;
 }

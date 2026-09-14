@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Between, IsNull, Not, Repository } from "typeorm";
+import { Between, FindOptionsWhere, IsNull, Not, Repository } from "typeorm";
 import { Appointment, AppointmentStatus } from "../entity/appointment.entity";
 
 export interface AppointmentFilters {
@@ -24,21 +24,21 @@ export class AppointmentRepository {
     async findById(id: string, tenantId: string): Promise<Appointment> {
         const appointment = await this.appointmentRepo.findOne({
             where: { id, company: { id: tenantId } },
-            relations: ['service', 'client', 'employee'],
+            relations: ['service', 'client', 'employee', 'company'],
         });
         if (!appointment) throw new NotFoundException('Cita no encontrada');
         return appointment;
     }
 
     async findAll(tenantId: string, filters: AppointmentFilters = {}): Promise<Appointment[]> {
-        const where: any = { company: { id: tenantId } };
+        const where: FindOptionsWhere<Appointment> = { company: { id: tenantId } };
         if (filters.status) where.status = filters.status;
         if (filters.employeeId) where.employee = { id: filters.employeeId };
         if (filters.from && filters.to) where.scheduledAt = Between(filters.from, filters.to);
 
         return this.appointmentRepo.find({
             where,
-            relations: ['service', 'client', 'employee'],
+            relations: ['service', 'client', 'employee', 'company'],
             order: { scheduledAt: 'ASC' },
         });
     }

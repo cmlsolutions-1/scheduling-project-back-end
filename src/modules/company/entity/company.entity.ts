@@ -29,6 +29,9 @@ export class Company extends AuditEntity {
     @Column({ length: 30, nullable: true })
     whatsappPhoneNumber?: string;
 
+    @Column({ length: 100, default: 'America/Bogota' })
+    timeZone!: string;
+
     @Column({
         type: 'enum',
         enum: CompanyStatus,

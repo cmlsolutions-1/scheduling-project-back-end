@@ -17,6 +17,20 @@ import { AppointmentMapper } from './appointment.mapper';
 import { Commission, CommissionStatus } from 'src/modules/billing/entity/commission.entity';
 import { Company, CompanyStatus } from 'src/modules/company/entity/company.entity';
 import { WhatsAppService } from 'src/modules/common/services/whatsapp.service';
+import {
+    canonicalizeIanaTimeZone,
+    getLocalDayOfWeek,
+    getUtcDayBounds,
+    utcToZonedDateTime,
+    zonedDateTimeToUtc,
+} from 'src/modules/common/utils/time-zone.util';
+
+interface AppointmentDateTimeInput {
+    scheduledAt?: string;
+    scheduledLocalDate?: string;
+    scheduledLocalTime?: string;
+    timeZone?: string;
+}
 
 @Injectable()
 export class AppointmentService {
@@ -44,6 +58,8 @@ export class AppointmentService {
     ) {}
 
     async create(dto: CreateAppointmentDto, tenantId: string, authorId: string) {
+        const company = await this.getActiveCompany(tenantId);
+        const scheduledDateTime = this.resolveScheduledDateTime(dto, company.timeZone);
         const client = await this.clientRepo.findOne({
             where: { id: dto.clientId, company: { id: tenantId }, status: ClientStatus.ACTIVE },
         });
@@ -66,17 +82,19 @@ export class AppointmentService {
             await this.ensureEmployeeIsAvailable(
                 employee,
                 tenantId,
-                new Date(dto.scheduledAt),
+                scheduledDateTime.scheduledAt,
+                scheduledDateTime.localDate,
+                company.timeZone,
                 dto.durationMinutes ?? this.getServiceDurationMinutes(service),
             );
         }
 
         const appointment = new Appointment();
-        appointment.company = { id: tenantId } as any;
+        appointment.company = company;
         appointment.client = client;
         appointment.service = service;
         appointment.employee = employee ?? undefined;
-        appointment.scheduledAt = new Date(dto.scheduledAt);
+        appointment.scheduledAt = scheduledDateTime.scheduledAt;
         appointment.durationMinutes = dto.durationMinutes ?? this.getServiceDurationMinutes(service);
         appointment.notes = dto.notes;
         appointment.status = AppointmentStatus.PENDING;
@@ -89,14 +107,12 @@ export class AppointmentService {
 
         
 
-        return AppointmentMapper.toResponse(saved);
+        return AppointmentMapper.toResponse(saved, company.timeZone);
     }
 
     async createPublic(dto: PublicCreateAppointmentDto, tenantId: string) {
-        const company = await this.companyRepo.findOne({
-            where: { id: tenantId, status: CompanyStatus.ACTIVE },
-        });
-        if (!company) throw new BadRequestException('Empresa no encontrada');
+        const company = await this.getActiveCompany(tenantId);
+        const scheduledDateTime = this.resolveScheduledDateTime(dto, company.timeZone);
 
         const service = await this.serviceRepo.findOne({
             where: { id: dto.serviceId, company: { id: tenantId }, status: ServiceItemStatus.ACTIVE },
@@ -115,7 +131,9 @@ export class AppointmentService {
             await this.ensureEmployeeIsAvailable(
                 employee,
                 tenantId,
-                new Date(dto.scheduledAt),
+                scheduledDateTime.scheduledAt,
+                scheduledDateTime.localDate,
+                company.timeZone,
                 dto.durationMinutes ?? this.getServiceDurationMinutes(service),
             );
         }
@@ -131,11 +149,11 @@ export class AppointmentService {
         }, tenantId);
 
         const appointment = new Appointment();
-        appointment.company = { id: tenantId } as any;
+        appointment.company = company;
         appointment.client = client;
         appointment.service = service;
         appointment.employee = employee ?? undefined;
-        appointment.scheduledAt = new Date(dto.scheduledAt);
+        appointment.scheduledAt = scheduledDateTime.scheduledAt;
         appointment.durationMinutes = dto.durationMinutes ?? this.getServiceDurationMinutes(service);
         appointment.notes = dto.notes;
         appointment.status = AppointmentStatus.PENDING;
@@ -150,7 +168,7 @@ export class AppointmentService {
             employee,
             appointment: saved,
         });
-        return AppointmentMapper.toResponse(saved);
+        return AppointmentMapper.toResponse(saved, company.timeZone);
     }
 
     async findAll(tenantId: string, filters: AppointmentFilters = {}) {
@@ -160,7 +178,7 @@ export class AppointmentService {
 
     async findOne(id: string, tenantId: string) {
         const appointment = await this.appointmentRepo.findById(id, tenantId);
-        return AppointmentMapper.toResponse(appointment);
+        return AppointmentMapper.toResponse(appointment, appointment.company.timeZone);
     }
 
     async findMy(employeeId: string, tenantId: string, filters: AppointmentFilters = {}) {
@@ -177,10 +195,11 @@ export class AppointmentService {
             await this.createCommissionIfNeeded(appointment, tenantId, authorId);
         }
         const saved = await this.appointmentRepo.save(appointment);
-        return AppointmentMapper.toResponse(saved);
+        return AppointmentMapper.toResponse(saved, appointment.company.timeZone);
     }
 
     async findPublicAvailability(query: PublicAvailabilityQueryDto, tenantId: string): Promise<PublicAvailabilityDto> {
+        const company = await this.getActiveCompany(tenantId);
         const service = await this.serviceRepo.findOne({
             where: { id: query.serviceId, company: { id: tenantId }, status: ServiceItemStatus.ACTIVE },
         });
@@ -195,17 +214,24 @@ export class AppointmentService {
         await this.ensureEmployeeCanPerformService(employee.id, service.id, tenantId);
 
         const durationMinutes = this.getServiceDurationMinutes(service);
-        const { startOfDay, endOfDay } = this.getDayBounds(query.date);
+        const { startOfDay, endOfDay } = this.getSafeUtcDayBounds(query.date, company.timeZone);
         const appointments = await this.appointmentRepo.findBlockingAppointmentsForEmployeeOnDate(
             employee.id,
             tenantId,
             startOfDay,
             endOfDay,
         );
-        const slots = this.buildAvailabilitySlots(query.date, durationMinutes, appointments, employee.employeeSchedules ?? []);
+        const slots = this.buildAvailabilitySlots(
+            query.date,
+            company.timeZone,
+            durationMinutes,
+            appointments,
+            employee.employeeSchedules ?? [],
+        );
 
         return {
             date: query.date,
+            timeZone: company.timeZone,
             employeeId: employee.id,
             serviceId: service.id,
             durationMinutes,
@@ -227,9 +253,9 @@ export class AppointmentService {
         const amount = Number(appointment.servicePrice) * (Number(appointment.commissionRate ?? 0) / 100);
 
         const commission = this.commissionRepo.create({
-            company: { id: tenantId } as any,
-            employee: { id: appointment.employeeId } as any,
-            appointment: { id: appointment.id } as any,
+            company: { id: tenantId },
+            employee: { id: appointment.employeeId },
+            appointment: { id: appointment.id },
             amount,
             status: CommissionStatus.PENDING,
             createdBy: authorId,
@@ -260,8 +286,15 @@ export class AppointmentService {
         return Number((baseCommissionRate + extraCommissionRate).toFixed(2));
     }
 
-    private async ensureEmployeeIsAvailable(employee: User, tenantId: string, scheduledAt: Date, durationMinutes: number) {
-        const { startOfDay, endOfDay } = this.getDayBounds(this.formatDateOnly(scheduledAt));
+    private async ensureEmployeeIsAvailable(
+        employee: User,
+        tenantId: string,
+        scheduledAt: Date,
+        scheduledLocalDate: string,
+        timeZone: string,
+        durationMinutes: number,
+    ) {
+        const { startOfDay, endOfDay } = this.getSafeUtcDayBounds(scheduledLocalDate, timeZone);
         const appointments = await this.appointmentRepo.findBlockingAppointmentsForEmployeeOnDate(
             employee.id,
             tenantId,
@@ -271,7 +304,11 @@ export class AppointmentService {
 
         const candidateStart = scheduledAt.getTime();
         const candidateEnd = candidateStart + durationMinutes * 60 * 1000;
-        const scheduleBlocks = this.resolveScheduleBlocksForDate(this.formatDateOnly(scheduledAt), employee.employeeSchedules ?? []);
+        const scheduleBlocks = this.resolveScheduleBlocksForDate(
+            scheduledLocalDate,
+            timeZone,
+            employee.employeeSchedules ?? [],
+        );
 
         const fitsSchedule = scheduleBlocks.some((block) =>
             candidateStart >= block.start.getTime() && candidateEnd <= block.end.getTime(),
@@ -294,13 +331,15 @@ export class AppointmentService {
 
     private buildAvailabilitySlots(
         date: string,
+        timeZone: string,
         durationMinutes: number,
         appointments: Appointment[],
         schedules: EmployeeSchedule[],
     ): PublicAvailabilitySlotDto[] {
         const slots: PublicAvailabilitySlotDto[] = [];
-        const scheduleBlocks = this.resolveScheduleBlocksForDate(date, schedules);
+        const scheduleBlocks = this.resolveScheduleBlocksForDate(date, timeZone, schedules);
         const now = new Date();
+        const emittedLocalTimes = new Set<string>();
 
         for (const block of scheduleBlocks) {
             for (
@@ -315,29 +354,30 @@ export class AppointmentService {
                     return slotStart.getTime() < appointmentEnd && slotEnd.getTime() > appointmentStart;
                 });
                 const isPast = slotStart.getTime() < now.getTime();
+                const localTime = utcToZonedDateTime(slotStart, timeZone).time;
+
+                // A repeated wall-clock time during the DST fallback cannot be
+                // disambiguated by the public local-date/local-time contract.
+                if (emittedLocalTimes.has(localTime)) {
+                    continue;
+                }
+                emittedLocalTimes.add(localTime);
+
+                let isUnambiguousLocalTime = true;
+                try {
+                    isUnambiguousLocalTime = zonedDateTimeToUtc(date, localTime, timeZone).getTime() === slotStart.getTime();
+                } catch {
+                    isUnambiguousLocalTime = false;
+                }
 
                 slots.push({
-                    time: this.formatTime(slotStart),
-                    available: !overlaps && !isPast,
+                    time: localTime,
+                    available: !overlaps && !isPast && isUnambiguousLocalTime,
                 });
             }
         }
 
         return slots;
-    }
-
-    private getDayBounds(date: string): { startOfDay: Date; endOfDay: Date } {
-        const [year, month, day] = date.split('-').map(Number);
-        const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
-
-        if (this.formatDateOnly(startOfDay) !== date) {
-            throw new BadRequestException('Fecha invalida');
-        }
-
-        return {
-            startOfDay,
-            endOfDay: new Date(year, month - 1, day, 23, 59, 59, 999),
-        };
     }
 
     private getServiceDurationMinutes(service: ServiceItem): number {
@@ -348,35 +388,27 @@ export class AppointmentService {
         return appointment.durationMinutes ?? AppointmentService.DEFAULT_SERVICE_DURATION_MINUTES;
     }
 
-    private formatTime(value: Date): string {
-        return `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
-    }
-
-    private formatDateOnly(value: Date): string {
-        return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-    }
-
     private resolveScheduleBlocksForDate(
         date: string,
+        timeZone: string,
         schedules: EmployeeSchedule[],
     ): Array<{ start: Date; end: Date }> {
         const dayOfWeek = this.resolveDayOfWeek(date);
 
         if (!schedules.length) {
-            return [this.buildDefaultScheduleBlock(date)];
+            return [this.buildDefaultScheduleBlock(date, timeZone)];
         }
 
         return schedules
             .filter((schedule) => schedule.dayOfWeek === dayOfWeek)
             .sort((a, b) => a.startTime.localeCompare(b.startTime))
             .map((schedule) => ({
-                start: this.combineDateAndTime(date, schedule.startTime),
-                end: this.combineDateAndTime(date, schedule.endTime),
+                start: this.combineDateAndTime(date, schedule.startTime, timeZone),
+                end: this.combineDateAndTime(date, schedule.endTime, timeZone),
             }));
     }
 
     private resolveDayOfWeek(date: string): EmployeeScheduleDay {
-        const { startOfDay } = this.getDayBounds(date);
         const dayMap: Record<number, EmployeeScheduleDay> = {
             0: EmployeeScheduleDay.SUNDAY,
             1: EmployeeScheduleDay.MONDAY,
@@ -387,23 +419,30 @@ export class AppointmentService {
             6: EmployeeScheduleDay.SATURDAY,
         };
 
-        return dayMap[startOfDay.getDay()];
+        return dayMap[getLocalDayOfWeek(date)];
     }
 
-    private buildDefaultScheduleBlock(date: string): { start: Date; end: Date } {
-        const { startOfDay } = this.getDayBounds(date);
-        const endOfDay = new Date(startOfDay);
-
-        startOfDay.setHours(AppointmentService.WORKDAY_START_HOUR, 0, 0, 0);
-        endOfDay.setHours(AppointmentService.WORKDAY_END_HOUR, 0, 0, 0);
-
-        return { start: startOfDay, end: endOfDay };
+    private buildDefaultScheduleBlock(date: string, timeZone: string): { start: Date; end: Date } {
+        return {
+            start: this.combineDateAndTime(
+                date,
+                `${String(AppointmentService.WORKDAY_START_HOUR).padStart(2, '0')}:00`,
+                timeZone,
+            ),
+            end: this.combineDateAndTime(
+                date,
+                `${String(AppointmentService.WORKDAY_END_HOUR).padStart(2, '0')}:00`,
+                timeZone,
+            ),
+        };
     }
 
-    private combineDateAndTime(date: string, time: string): Date {
-        const [year, month, day] = date.split('-').map(Number);
-        const [hours, minutes] = time.split(':').map(Number);
-        return new Date(year, month - 1, day, hours, minutes, 0, 0);
+    private combineDateAndTime(date: string, time: string, timeZone: string): Date {
+        try {
+            return zonedDateTimeToUtc(date, time, timeZone);
+        } catch (error) {
+            throw new BadRequestException(error instanceof Error ? error.message : 'Fecha u hora invalida');
+        }
     }
 
     private async sendPublicAppointmentConfirmation(input: {
@@ -436,8 +475,8 @@ export class AppointmentService {
         const companyName = input.company.name;
         const serviceName = input.service.name;
         const employeeName = input.employee?.name;
-        const scheduledDate = this.formatWhatsAppDate(input.appointment.scheduledAt);
-        const scheduledTime = this.formatWhatsAppTime(input.appointment.scheduledAt);
+        const scheduledDate = this.formatWhatsAppDate(input.appointment.scheduledAt, input.company.timeZone);
+        const scheduledTime = this.formatWhatsAppTime(input.appointment.scheduledAt, input.company.timeZone);
         const partyEmoji = '\u{1F389}';
         const checkEmoji = '\u{2705}';
         const calendarEmoji = '\u{1F4C5}';
@@ -463,19 +502,99 @@ export class AppointmentService {
         return confirmationMessages[Math.floor(Math.random() * confirmationMessages.length)];
     }
 
-    private formatWhatsAppDate(value: Date): string {
+    private formatWhatsAppDate(value: Date, timeZone: string): string {
         return new Intl.DateTimeFormat('es-CO', {
+            timeZone,
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
         }).format(new Date(value));
     }
 
-    private formatWhatsAppTime(value: Date): string {
+    private formatWhatsAppTime(value: Date, timeZone: string): string {
         return new Intl.DateTimeFormat('es-CO', {
+            timeZone,
             hour: '2-digit',
             minute: '2-digit',
             hour12: true,
         }).format(new Date(value));
+    }
+
+    private async getActiveCompany(tenantId: string): Promise<Company> {
+        const company = await this.companyRepo.findOne({
+            where: { id: tenantId, status: CompanyStatus.ACTIVE },
+        });
+        if (!company) throw new BadRequestException('Empresa no encontrada');
+        return company;
+    }
+
+    private resolveScheduledDateTime(
+        input: AppointmentDateTimeInput,
+        companyTimeZone: string,
+    ): { scheduledAt: Date; localDate: string } {
+        const hasAnyLocalField = input.scheduledLocalDate !== undefined
+            || input.scheduledLocalTime !== undefined
+            || input.timeZone !== undefined;
+
+        if (hasAnyLocalField) {
+            if (!input.scheduledLocalDate || !input.scheduledLocalTime || !input.timeZone) {
+                throw new BadRequestException(
+                    'scheduledLocalDate, scheduledLocalTime y timeZone deben enviarse juntos',
+                );
+            }
+
+            const canonicalCompanyTimeZone = canonicalizeIanaTimeZone(companyTimeZone);
+            const canonicalInputTimeZone = canonicalizeIanaTimeZone(input.timeZone);
+            if (canonicalInputTimeZone !== canonicalCompanyTimeZone) {
+                throw new BadRequestException('timeZone debe coincidir con la zona horaria de la empresa');
+            }
+
+            const scheduledAt = this.combineDateAndTime(
+                input.scheduledLocalDate,
+                input.scheduledLocalTime,
+                canonicalCompanyTimeZone,
+            );
+
+            if (input.scheduledAt) {
+                const suppliedScheduledAt = this.parseAbsoluteScheduledAt(input.scheduledAt);
+                if (suppliedScheduledAt.getTime() !== scheduledAt.getTime()) {
+                    throw new BadRequestException('scheduledAt no coincide con la fecha y hora locales');
+                }
+            }
+
+            return { scheduledAt, localDate: input.scheduledLocalDate };
+        }
+
+        if (!input.scheduledAt) {
+            throw new BadRequestException(
+                'Debe enviar scheduledLocalDate, scheduledLocalTime y timeZone',
+            );
+        }
+
+        const scheduledAt = this.parseAbsoluteScheduledAt(input.scheduledAt);
+        return {
+            scheduledAt,
+            localDate: utcToZonedDateTime(scheduledAt, companyTimeZone).date,
+        };
+    }
+
+    private parseAbsoluteScheduledAt(value: string): Date {
+        if (!/(?:Z|[+-]\d{2}:\d{2})$/i.test(value)) {
+            throw new BadRequestException('scheduledAt debe incluir Z o un offset UTC explicito');
+        }
+
+        const result = new Date(value);
+        if (Number.isNaN(result.getTime())) {
+            throw new BadRequestException('scheduledAt es invalido');
+        }
+        return result;
+    }
+
+    private getSafeUtcDayBounds(date: string, timeZone: string): { startOfDay: Date; endOfDay: Date } {
+        try {
+            return getUtcDayBounds(date, timeZone);
+        } catch (error) {
+            throw new BadRequestException(error instanceof Error ? error.message : 'Fecha invalida');
+        }
     }
 }

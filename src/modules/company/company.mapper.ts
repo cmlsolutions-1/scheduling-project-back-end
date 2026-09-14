@@ -12,6 +12,7 @@ export class CompanyMapper {
             description: company.description,
             frontendDomain: company.frontendDomain,
             whatsappPhoneNumber: company.whatsappPhoneNumber,
+            timeZone: company.timeZone,
             status: company.status,
         };
     }
@@ -29,6 +30,7 @@ export class CompanyMapper {
             description: company.description,
             frontendDomain: company.frontendDomain,
             whatsappPhoneNumber: company.whatsappPhoneNumber,
+            timeZone: company.timeZone,
             status: company.status,
             hasAdmin: !!admin,
             admin: admin ? this.toAdminResponse(admin) : null,
