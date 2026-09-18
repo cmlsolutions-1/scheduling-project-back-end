@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException } from '@nestjs/common';
 import { AppointmentService } from './appointment.service';
 import { AppointmentStatus } from './entity/appointment.entity';
 import { CompanyStatus } from '../company/entity/company.entity';
@@ -24,12 +24,17 @@ describe('AppointmentService time zones', () => {
   const clientId = '44444444-4444-4444-8444-444444444444';
 
   function buildService(
-    overrides: { appointments?: Partial<Appointment>[] } = {},
+    overrides: {
+      appointments?: Partial<Appointment>[];
+      appointment?: Partial<Appointment>;
+      whatsappSent?: boolean;
+    } = {},
   ) {
     const company = {
       id: tenantId,
       name: 'Empresa Madrid',
       timeZone: 'Europe/Madrid',
+      whatsappPhoneNumber: '34910000000',
       status: CompanyStatus.ACTIVE,
     };
     const serviceItem = {
@@ -69,6 +74,18 @@ describe('AppointmentService time zones', () => {
     );
     const appointmentRepository = {
       findBlockingAppointmentsForEmployeeOnDate,
+      findById: jest.fn().mockResolvedValue({
+        id: '55555555-5555-4555-8555-555555555555',
+        scheduledAt: new Date('2026-10-21T07:00:00.000Z'),
+        durationMinutes: 60,
+        status: AppointmentStatus.PENDING,
+        company,
+        client: { id: clientId, name: 'Cliente', phone: '34600000000' },
+        service: serviceItem,
+        employee,
+        ...overrides.appointment,
+      }),
+      findAll: jest.fn().mockResolvedValue([]),
       save: saveAppointment,
     };
     const clientRepo = {
@@ -82,6 +99,7 @@ describe('AppointmentService time zones', () => {
         .mockResolvedValue({ id: 'assignment', extraCommissionRate: 0 }),
     };
     const companyRepo = { findOne: jest.fn().mockResolvedValue(company) };
+    const sendMessage = jest.fn().mockResolvedValue(overrides.whatsappSent ?? true);
 
     const subject = new AppointmentService(
       appointmentRepository as unknown as AppointmentRepository,
@@ -92,13 +110,16 @@ describe('AppointmentService time zones', () => {
       employeeServiceRepo as unknown as Repository<EmployeeService>,
       {} as Repository<Commission>,
       companyRepo as unknown as Repository<Company>,
-      { sendMessage: jest.fn() } as unknown as WhatsAppService,
+      { sendMessage } as unknown as WhatsAppService,
     );
 
     return {
       subject,
       findBlockingAppointmentsForEmployeeOnDate,
+      findAppointmentById: appointmentRepository.findById,
+      findAllAppointments: appointmentRepository.findAll,
       saveAppointment,
+      sendMessage,
     };
   }
 
@@ -176,5 +197,54 @@ describe('AppointmentService time zones', () => {
         'admin-id',
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('resends the appointment confirmation to the client', async () => {
+    const { subject, findAppointmentById, sendMessage } = buildService();
+
+    await expect(
+      subject.resendClientNotification(
+        '55555555-5555-4555-8555-555555555555',
+        tenantId,
+      ),
+    ).resolves.toEqual({
+      appointmentId: '55555555-5555-4555-8555-555555555555',
+      channel: 'WHATSAPP',
+      sent: true,
+    });
+
+    expect(findAppointmentById).toHaveBeenCalledWith(
+      '55555555-5555-4555-8555-555555555555',
+      tenantId,
+    );
+    expect(sendMessage).toHaveBeenCalledWith({
+      fromPhoneNumber: '34910000000',
+      toPhoneNumber: '34600000000',
+      message: expect.stringContaining('Empresa Madrid'),
+    });
+  });
+
+  it('reports a WhatsApp provider failure when resending', async () => {
+    const { subject } = buildService({ whatsappSent: false });
+
+    await expect(
+      subject.resendClientNotification(
+        '55555555-5555-4555-8555-555555555555',
+        tenantId,
+      ),
+    ).rejects.toBeInstanceOf(BadGatewayException);
+  });
+
+  it('resolves date-only list filters in the company time zone', async () => {
+    const { subject, findAllAppointments } = buildService();
+
+    await subject.findAll(tenantId, {
+      from: '2026-10-21',
+      to: '2026-10-21',
+    });
+
+    const filters = findAllAppointments.mock.calls[0][1];
+    expect(filters.from.toISOString()).toBe('2026-10-20T22:00:00.000Z');
+    expect(filters.to.toISOString()).toBe('2026-10-21T21:59:59.999Z');
   });
 });

@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Post, Put, Query, Request, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Put, Query, Request, UseGuards } from '@nestjs/common';
+import { ApiBadGatewayResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorators';
 import { JwtAuthGuard } from '../auth/guards/jwt/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -14,6 +14,8 @@ import { PublicCreateAppointmentDto } from './dto/public-create-appointment.dto'
 import { ResponseAppointmentDto } from './dto/response-appointment.dto';
 import { UpdateAppointmentStatusDto } from './dto/update-appointment-status.dto';
 import { AppointmentFilterDto, AppointmentFilterEmployeeDto } from './dto/filter-appointment.dto';
+import { ResendAppointmentNotificationResponseDto } from './dto/resend-appointment-notification-response.dto';
+import { ErrorResponseDto } from '../common/dto/error-response.dto';
 
 @Controller('appointments')
 export class AppointmentController {
@@ -37,6 +39,18 @@ export class AppointmentController {
         return this.service.createPublic(dto, req.tenant.id);
     }
 
+    @Post(':id/resend-notification')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
+    @ApiBearerAuth('jwt')
+    @ApiOkWrapped(ResendAppointmentNotificationResponseDto, 'Notificacion de reserva reenviada')
+    @ApiBadGatewayResponse({ description: 'El proveedor de WhatsApp no pudo enviar la notificacion', type: ErrorResponseDto })
+    @ApiCommonErrors()
+    @Roles('ADMIN')
+    resendNotification(@Param('id') id: string, @Request() req) {
+        return this.service.resendClientNotification(id, req.tenant.id);
+    }
+
     @Get('public/availability')
     @UseGuards(TenantGuard)
     @ApiOkWrapped(PublicAvailabilityDto, 'Disponibilidad publica')
@@ -57,8 +71,8 @@ export class AppointmentController {
     ) {
          return this.service.findAll(req.tenant.id, {
             status: query.status,
-            from: query.from ? new Date(query.from) : undefined,
-            to: query.to ? new Date(query.to) : undefined,
+            from: query.from,
+            to: query.to,
             employeeId: query.employeeId,
         });
     }
@@ -75,8 +89,8 @@ export class AppointmentController {
     ) {
         return this.service.findMy(req.user.id, req.tenant.id, {
             status: query.status,
-            from: query.from ? new Date(query.from) : undefined,
-            to: query.to ? new Date(query.to) : undefined,
+            from: query.from,
+            to: query.to,
         });
     }
 

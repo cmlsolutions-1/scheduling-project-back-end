@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Between, FindOptionsWhere, IsNull, Not, Repository } from "typeorm";
+import { Between, FindOptionsWhere, IsNull, LessThanOrEqual, MoreThanOrEqual, Not, Repository } from "typeorm";
 import { Appointment, AppointmentStatus } from "../entity/appointment.entity";
 
 export interface AppointmentFilters {
@@ -34,7 +34,13 @@ export class AppointmentRepository {
         const where: FindOptionsWhere<Appointment> = { company: { id: tenantId } };
         if (filters.status) where.status = filters.status;
         if (filters.employeeId) where.employee = { id: filters.employeeId };
-        if (filters.from && filters.to) where.scheduledAt = Between(filters.from, filters.to);
+        if (filters.from && filters.to) {
+            where.scheduledAt = Between(filters.from, filters.to);
+        } else if (filters.from) {
+            where.scheduledAt = MoreThanOrEqual(filters.from);
+        } else if (filters.to) {
+            where.scheduledAt = LessThanOrEqual(filters.to);
+        }
 
         return this.appointmentRepo.find({
             where,

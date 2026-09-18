@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Client, ClientStatus } from 'src/modules/client/entity/client.entity';
@@ -24,12 +24,20 @@ import {
     utcToZonedDateTime,
     zonedDateTimeToUtc,
 } from 'src/modules/common/utils/time-zone.util';
+import { ResendAppointmentNotificationResponseDto } from './dto/resend-appointment-notification-response.dto';
 
 interface AppointmentDateTimeInput {
     scheduledAt?: string;
     scheduledLocalDate?: string;
     scheduledLocalTime?: string;
     timeZone?: string;
+}
+
+interface AppointmentListFilters {
+    status?: AppointmentStatus;
+    from?: string;
+    to?: string;
+    employeeId?: string;
 }
 
 @Injectable()
@@ -161,7 +169,7 @@ export class AppointmentService {
         appointment.commissionRate = this.resolveAppointmentCommissionRate(service, employeeServiceAssignment);
 
         const saved = await this.appointmentRepo.save(appointment);
-        await this.sendPublicAppointmentConfirmation({
+        await this.sendAppointmentConfirmation({
             company,
             client,
             service,
@@ -171,8 +179,44 @@ export class AppointmentService {
         return AppointmentMapper.toResponse(saved, company.timeZone);
     }
 
-    async findAll(tenantId: string, filters: AppointmentFilters = {}) {
-        const appointments = await this.appointmentRepo.findAll(tenantId, filters);
+    async resendClientNotification(
+        id: string,
+        tenantId: string,
+    ): Promise<ResendAppointmentNotificationResponseDto> {
+        const appointment = await this.appointmentRepo.findById(id, tenantId);
+
+        if (appointment.status === AppointmentStatus.CANCELLED) {
+            throw new BadRequestException('No se puede reenviar la notificacion de una cita cancelada');
+        }
+        if (!appointment.company.whatsappPhoneNumber) {
+            throw new BadRequestException('La empresa no tiene un numero de WhatsApp configurado');
+        }
+        if (!appointment.client.phone) {
+            throw new BadRequestException('El cliente no tiene un numero de telefono configurado');
+        }
+
+        const sent = await this.sendAppointmentConfirmation({
+            company: appointment.company,
+            client: appointment.client,
+            service: appointment.service,
+            employee: appointment.employee ?? null,
+            appointment,
+        });
+
+        if (!sent) {
+            throw new BadGatewayException('No fue posible enviar la notificacion por WhatsApp');
+        }
+
+        return {
+            appointmentId: appointment.id,
+            channel: 'WHATSAPP',
+            sent: true,
+        };
+    }
+
+    async findAll(tenantId: string, filters: AppointmentListFilters = {}) {
+        const resolvedFilters = await this.resolveAppointmentListFilters(tenantId, filters);
+        const appointments = await this.appointmentRepo.findAll(tenantId, resolvedFilters);
         return AppointmentMapper.toResponseList(appointments);
     }
 
@@ -181,8 +225,9 @@ export class AppointmentService {
         return AppointmentMapper.toResponse(appointment, appointment.company.timeZone);
     }
 
-    async findMy(employeeId: string, tenantId: string, filters: AppointmentFilters = {}) {
-        const appointments = await this.appointmentRepo.findForEmployee(employeeId, tenantId, filters);
+    async findMy(employeeId: string, tenantId: string, filters: AppointmentListFilters = {}) {
+        const resolvedFilters = await this.resolveAppointmentListFilters(tenantId, filters);
+        const appointments = await this.appointmentRepo.findForEmployee(employeeId, tenantId, resolvedFilters);
         return AppointmentMapper.toResponseList(appointments);
     }
 
@@ -445,19 +490,19 @@ export class AppointmentService {
         }
     }
 
-    private async sendPublicAppointmentConfirmation(input: {
+    private async sendAppointmentConfirmation(input: {
         company: Company;
         client: Client;
         service: ServiceItem;
         employee: User | null;
         appointment: Appointment;
-    }): Promise<void> {
+    }): Promise<boolean> {
         if (!input.company.whatsappPhoneNumber || !input.client.phone) {
-            return;
+            return false;
         }
 
         const message = this.buildRandomConfirmationMessage(input);
-        await this.whatsAppService.sendMessage({
+        return this.whatsAppService.sendMessage({
             fromPhoneNumber: input.company.whatsappPhoneNumber,
             toPhoneNumber: input.client.phone,
             message,
@@ -588,6 +633,52 @@ export class AppointmentService {
             throw new BadRequestException('scheduledAt es invalido');
         }
         return result;
+    }
+
+    private async resolveAppointmentListFilters(
+        tenantId: string,
+        filters: AppointmentListFilters,
+    ): Promise<AppointmentFilters> {
+        const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
+        const needsCompanyTimeZone = [filters.from, filters.to]
+            .some((value) => value !== undefined && dateOnlyPattern.test(value));
+        const companyTimeZone = needsCompanyTimeZone
+            ? (await this.getActiveCompany(tenantId)).timeZone
+            : undefined;
+
+        const resolveBound = (value: string | undefined, bound: 'from' | 'to'): Date | undefined => {
+            if (!value) {
+                return undefined;
+            }
+
+            if (dateOnlyPattern.test(value)) {
+                const bounds = this.getSafeUtcDayBounds(value, companyTimeZone!);
+                return bound === 'from' ? bounds.startOfDay : bounds.endOfDay;
+            }
+
+            if (!/(?:Z|[+-]\d{2}:\d{2})$/i.test(value)) {
+                throw new BadRequestException(`${bound} debe ser YYYY-MM-DD o incluir Z/offset UTC`);
+            }
+
+            const parsed = new Date(value);
+            if (Number.isNaN(parsed.getTime())) {
+                throw new BadRequestException(`${bound} es invalido`);
+            }
+            return parsed;
+        };
+
+        const from = resolveBound(filters.from, 'from');
+        const to = resolveBound(filters.to, 'to');
+        if (from && to && from.getTime() > to.getTime()) {
+            throw new BadRequestException('from no puede ser posterior a to');
+        }
+
+        return {
+            status: filters.status,
+            employeeId: filters.employeeId,
+            from,
+            to,
+        };
     }
 
     private getSafeUtcDayBounds(date: string, timeZone: string): { startOfDay: Date; endOfDay: Date } {
